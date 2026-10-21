@@ -38,11 +38,9 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
   return (
     <>
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" aria-label="LibreTV 首页" className="flex items-center shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="LibreTV" className="w-7 h-7 rounded-lg" />
-          </Link>
+        <div className="cinema-shell mx-auto h-16 flex items-center gap-3">
+          <Link href="/" aria-label="WAJJTV 首页" className="wajjtv-brand shrink-0"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden><path d="M5 3.5C5 2.7 5.9 2.2 6.6 2.6l15 8.5a1 1 0 0 1 0 1.8l-15 8.5A1.1 1.1 0 0 1 5 20.5Z" fill="currentColor" /></svg><span>WAJJTV</span></Link>
+          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' ? 'active' : ''}>发现</Link><Link href="/?view=rank#discover">排行榜</Link><button onClick={() => setHistoryOpen(true)}>观看记录</button></nav>}
 
           {showSearch && (
             <form
@@ -96,20 +94,16 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
 
           <div className="flex-1 sm:hidden" />
 
-          <nav className="flex items-center gap-1 ml-auto">
+          <nav className="utility-nav flex items-center gap-1 ml-auto">
             <HeaderLink href="/live" active={pathname === '/live'}>
               直播
             </HeaderLink>
-            <HeaderLink href="/about" active={pathname === '/about'}>
-              关于
-            </HeaderLink>
+
             <ThemeToggle />
-            <IconButton label="观看历史" onClick={() => setHistoryOpen(true)}>
-              <Icon name="clock" />
-            </IconButton>
-            <IconButton label="下载管理" onClick={requestShowDownloadManager}>
+            <span className="mobile-history"><IconButton label="观看历史" onClick={() => setHistoryOpen(true)}><Icon name="clock" /></IconButton></span>
+            <span className="desktop-download"><IconButton label="下载管理" onClick={requestShowDownloadManager}>
               <Icon name="download" />
-            </IconButton>
+            </IconButton></span>
             <IconButton label="设置" onClick={() => setSettingsOpen(true)}>
               <Icon name="gear" />
             </IconButton>

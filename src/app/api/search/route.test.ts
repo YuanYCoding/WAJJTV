@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { POST } from './route';
 import { SESSION_COOKIE, signSession } from '@/lib/auth';
 import type { SearchResponse, SearchStreamEvent, SourceConfig } from '@/lib/types';
+import { recordSourceResult } from '@/lib/source-health-server';
 
 /**
  * 聚合搜索接口单测：跨源聚合、同源去重、精确命中置顶、成人内容过滤、
@@ -62,6 +63,47 @@ afterEach(() => {
 });
 
 describe('POST /api/search', () => {
+  it('失效源即使被客户端提交也不发请求，复检成功后才重新搜索', async () => {
+    const source = { key: 'circuit', name: '复检源', url: 'https://cms.example.com/circuit-recovery-test' };
+    recordSourceResult(source.url, false, 100, 'HTTP 500');
+    recordSourceResult(source.url, false, 100, 'HTTP 500');
+    const upstream = vi.fn(async () => new Response(cmsList([{ vod_id: 1, vod_name: '恢复' }])));
+    vi.stubGlobal('fetch', upstream);
+    const blocked = await POST(makeRequest({ wd: '停用', sources: [source] }, true));
+    const first = JSON.parse((await blocked.text()).split('\n')[0]);
+    expect(first).toMatchObject({ skipped: true, ok: false });
+    expect(upstream).not.toHaveBeenCalled();
+    recordSourceResult(source.url, true, 100);
+    const recovered = await POST(makeRequest({ wd: '恢复', sources: [source] }));
+    expect((await recovered.json()).list).toHaveLength(1);
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
+  it('快源结果先送达，慢源未完成时仍能读取首个事件', async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/slow-stream')) await pending;
+      return new Response(cmsList([{ vod_id: 1, vod_name: '流式验证' }]));
+    }));
+    const sources = [{ key: 'fast', name: '快源', url: 'https://cms.example.com/fast-stream' }, { key: 'slow', name: '慢源', url: 'https://cms.example.com/slow-stream' }];
+    const response = await POST(makeRequest({ wd: '流式验证', sources }, true));
+    const reader = response.body!.getReader();
+    try {
+      const chunk = await reader.read();
+      expect(JSON.parse(new TextDecoder().decode(chunk.value).trim())).toMatchObject({ type: 'source', sourceKey: 'fast', ok: true });
+    } finally { release(); }
+    while (!(await reader.read()).done) { /* Drain the completed slow source and final event. */ }
+  });
+
+  it('相同 URL 的不同本地 key 不会命中错误的结果映射', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(cmsList([{ vod_id: 9, vod_name: '缓存映射' }]))));
+    const source = { key: 'old-key', name: '源', url: 'https://cms.example.com/cache-identity' };
+    await (await POST(makeRequest({ wd: '缓存映射', sources: [source] }))).json();
+    const response = await POST(makeRequest({ wd: '缓存映射', sources: [{ ...source, key: 'new-key' }] }));
+    expect((await response.json()).list[0].sourceKey).toBe('new-key');
+  });
+
   it('聚合多源结果：同源去重、成人内容过滤、失败源进 failures', async () => {
     mockUpstream();
     const res = await POST(makeRequest({ wd: '测试剧', sources: SOURCES, filterAdult: true }));

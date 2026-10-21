@@ -272,81 +272,31 @@ describe('可撤销删除与订阅同步状态', () => {
   });
 });
 
-describe('点播源自动停用阶梯', () => {
-  const fail = (key: string) => ({ sourceKey: key, ok: false, error: '超时', list: [] });
-  const okOutcome = (key: string) => ({ sourceKey: key, ok: true, ms: 12, list: [] });
-  /** 连续两次搜索失败（每次搜索各记录一次），返回两次调用产生的停用事件合集 */
-  const failTwice = (key: string) => [
-    ...store().recordSourceHealth([fail(key)]),
-    ...store().recordSourceHealth([fail(key)]),
-  ];
-  /** 模拟停用到期：把截止时间挪到过去 */
-  const expire = (key: string) => {
-    const entry = store().sourceHealth[key];
-    useAppStore.setState({
-      sourceHealth: { ...store().sourceHealth, [key]: { ...entry, disabledUntil: Date.now() - 1 } },
-    });
-  };
-
+describe('点播源停用与验证恢复', () => {
+  const fail = { sourceKey: 'a', ok: false, error: '超时', list: [] };
   beforeEach(() => useAppStore.setState({ sourceHealth: {} }));
-
-  it('达到阈值才停用，首次为 30 分钟', () => {
-    expect(store().recordSourceHealth([fail('a')])).toEqual([]);
+  it('连续两次失败后停用，计时到期仍跳过搜索', () => {
+    store().recordSourceHealth([fail]);
     expect(isSourceDisabled(store(), 'a')).toBe(false);
-
-    const events = failTwice('a');
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ key: 'a', level: 1, permanent: false, ttlMs: SOURCE_DISABLE_LADDER[0] });
+    const events = store().recordSourceHealth([fail]);
+    expect(events[0].ttlMs).toBe(SOURCE_DISABLE_LADDER[0]);
+    const e = store().sourceHealth.a;
+    useAppStore.setState({ sourceHealth: { a: { ...e, disabledUntil: Date.now() - 1 } } });
     expect(isSourceDisabled(store(), 'a')).toBe(true);
   });
-
-  it('到期恢复后再次连续失败 → 升级为 24 小时', () => {
-    failTwice('a');
-    expire('a');
-    // 到期即恢复参与搜索（懒判断，无需清理标记）
+  it('复检成功立即清零失败和停用状态，保留勾选意图', () => {
+    store().recordSourceHealth([fail, fail]);
+    const selected = store().selectedKeys;
+    store().recordSourceHealth([{ sourceKey: 'a', ok: true, ms: 120, list: [] }]);
     expect(isSourceDisabled(store(), 'a')).toBe(false);
-
-    const events = failTwice('a');
-    expect(events[0]).toMatchObject({ level: 2, permanent: false, ttlMs: SOURCE_DISABLE_LADDER[1] });
+    expect(store().sourceHealth.a.failStreak).toBe(0);
+    expect(store().selectedKeys).toEqual(selected);
   });
-
-  it('阶梯用尽 → 长期停用，不随到期恢复，须手动清除', () => {
-    failTwice('a');
-    expire('a');
-    failTwice('a');
-    expire('a');
-    const events = failTwice('a');
-    expect(events[0]).toMatchObject({ level: 3, permanent: true });
-    expect(events[0].ttlMs).toBeUndefined();
-
-    // 即便把停用时间挪到过去也不会自动恢复
-    expire('a');
-    expect(isSourceDisabled(store(), 'a')).toBe(true);
-
-    store().clearSourceHealth('a');
-    expect(isSourceDisabled(store(), 'a')).toBe(false);
-  });
-
-  it('成功一次降一级：偶发抽风的源不会一路升到长期停用', () => {
-    failTwice('a'); // 第 1 级
-    expire('a');
-    failTwice('a'); // 第 2 级
-    expire('a');
-
-    store().recordSourceHealth([okOutcome('a')]);
-    expect(store().sourceHealth['a'].disableCount).toBe(1);
-
-    const events = failTwice('a');
-    expect(events[0]).toMatchObject({ level: 2, permanent: false });
-  });
-
-  it('成功后立即清除停用标记与失败连击', () => {
-    failTwice('a');
-    expect(isSourceDisabled(store(), 'a')).toBe(true);
-
-    store().recordSourceHealth([okOutcome('a')]);
-    expect(isSourceDisabled(store(), 'a')).toBe(false);
-    expect(store().sourceHealth['a'].failStreak).toBe(0);
+  it('跳过源不累计新的失败次数', () => {
+    store().recordSourceHealth([fail, fail]);
+    const previous = store().sourceHealth.a;
+    store().recordSourceHealth([{ ...fail, skipped: true }]);
+    expect(store().sourceHealth.a).toEqual(previous);
   });
 });
 

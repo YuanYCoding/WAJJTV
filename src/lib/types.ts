@@ -54,6 +54,7 @@ export interface DoubanItem {
 }
 
 export interface SourceSearchOutcome {
+  skipped?: boolean;
   sourceKey: string;
   ok: boolean;
   list: SearchResultItem[];

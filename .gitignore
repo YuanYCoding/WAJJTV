@@ -12,3 +12,6 @@ vitest-results.json
 .zcode/
 .codebuddy/
 generated-images/
+private/
+data/
+.qa/

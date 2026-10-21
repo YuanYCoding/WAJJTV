@@ -207,13 +207,15 @@ function TabRow<T extends string>({
 
 // —— 点播源面板 ——
 
-type VodFilter = 'all' | 'enabled' | 'disabled' | 'sub' | 'manual';
+type VodFilter = 'healthy' | 'unknown' | 'all' | 'enabled' | 'disabled' | 'sub' | 'manual';
 
 // 与直播源面板保持同一组筛选项与顺序：先状态（已启用 / 已停用），后来源（来自订阅 / 手动添加）
 const VOD_FILTERS: { id: VodFilter; label: string }[] = [
   { id: 'all', label: '全部' },
-  { id: 'enabled', label: '已启用' },
-  { id: 'disabled', label: '已停用' },
+  { id: 'healthy', label: '正常' },
+  { id: 'unknown', label: '待检测 / 待复检' },
+  { id: 'enabled', label: '参与搜索' },
+  { id: 'disabled', label: '暂时失效' },
   { id: 'sub', label: '来自订阅' },
   { id: 'manual', label: '手动添加' },
 ];
@@ -237,6 +239,8 @@ function VodSourcesPanel() {
       // 已启用 = 勾选中且当前未被自动停用（即真正在参与搜索的源）
       if (filter === 'enabled' && !(store.selectedKeys.includes(s.key) && !isSourceDisabled(store, s.key))) return false;
       if (filter === 'disabled' && !isSourceDisabled(store, s.key)) return false;
+      if (filter === 'healthy' && !store.sourceHealth[s.key]?.ok) return false;
+      if (filter === 'unknown' && (store.sourceHealth[s.key]?.ok || isSourceDisabled(store, s.key))) return false;
       if (filter === 'sub' && !fromSub) return false;
       // 手动添加 = 既非订阅导入、也非部署者预置
       if (filter === 'manual' && (fromSub || envKeys.has(s.key))) return false;
@@ -271,11 +275,10 @@ function VodSourcesPanel() {
   };
 
   /** 一键恢复被自动停用的源（仅「已停用」筛选下提供） */
-  const restoreAll = () => {
-    const keys = filtered.filter((s) => isSourceDisabled(store, s.key)).map((s) => s.key);
-    if (keys.length === 0) return;
-    keys.forEach((k) => useAppStore.getState().clearSourceHealth(k));
-    toast(`已恢复 ${keys.length} 个源`, 'success');
+  const restoreAll = async () => {
+    const sources = filtered.filter((s) => isSourceDisabled(store, s.key));
+    const result = await probe(sources);
+    if (result) toast(`复检完成：${result.ok} 个源已恢复，其余继续暂时停用`, 'info');
   };
 
   const empty = store.envSources.length === 0 && store.customAPIs.length === 0;
@@ -284,7 +287,7 @@ function VodSourcesPanel() {
     <section>
       <SectionTitle
         title="点播源"
-        hint={empty ? undefined : `共 ${all.length} 个 · 已启用 ${all.filter((s) => store.selectedKeys.includes(s.key)).length}`}
+        hint={empty ? undefined : `共 ${all.length} 个 · 正常 ${all.filter((s) => store.sourceHealth[s.key]?.ok).length} · 暂时失效 ${all.filter((s) => isSourceDisabled(store, s.key)).length}`}
         extra={
           <button className="btn-primary btn-sm" onClick={() => setEditing('__new__')}>
             <Icon name="plus" className="w-3.5 h-3.5" />
@@ -315,6 +318,7 @@ function VodSourcesPanel() {
         />
       ) : (
         <>
+          <p className="text-xs text-muted leading-relaxed mb-4">连续失败 2 次后暂时停用。正常源每 15 分钟检查；失效源按 5 / 15 / 30 / 60 分钟复检，成功后自动恢复。自定义源在页面打开时复检。</p>
           <div className="space-y-2 mb-3">
             <SearchInput value={query} onChange={setQuery} placeholder="搜索名称或地址" />
             <div className="flex flex-wrap items-center gap-1">
@@ -347,7 +351,7 @@ function VodSourcesPanel() {
               {/* 查看「已停用」时提供一键恢复，省去逐个点击 */}
               {filter === 'disabled' && (
                 <button className="btn-ghost btn-sm" onClick={restoreAll} disabled={filtered.length === 0}>
-                  全部恢复
+                  复检失效源
                 </button>
               )}
             </div>

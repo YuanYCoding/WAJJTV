@@ -1,0 +1,668 @@
+{
+  "date": "2026-10-21",
+  "testLocation": "deployment server",
+  "baseEndpointsTested": 66,
+  "method": "Directory JSON, search for 流浪地球, HLS playlist and capped video segment fetch. Additional /at/json variants were rechecked. Resolution is a limited sample, not a provider-wide guarantee.",
+  "sources": [
+    {
+      "name": "爱奇艺",
+      "url": "https://iqiyizyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:46.389341Z",
+      "ok": false,
+      "error": "HTTP Error 503: Service Temporarily Unavailable",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "魔都资源",
+      "url": "https://www.mdzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:54.419796Z",
+      "catalogMs": 3329,
+      "searchMs": 1923,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "红牛资源",
+      "url": "https://www.hongniuzy3.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:50.766016Z",
+      "catalogMs": 1430,
+      "searchMs": 1065,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "金鹰资源",
+      "url": "https://jyzyapi.com/provide/vod",
+      "checkedAt": "2026-10-21T09:36:51.170807Z",
+      "catalogMs": 1904,
+      "searchMs": 1492,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "豪华资源",
+      "url": "https://hhzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:52.304463Z",
+      "catalogMs": 2043,
+      "searchMs": 1315,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lziapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:55.468173Z",
+      "catalogMs": 1790,
+      "searchMs": 2469,
+      "searchCount": 7,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "非凡资源",
+      "url": "https://api.ffzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:56.591021Z",
+      "catalogMs": 2395,
+      "searchMs": 1659,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "极速资源",
+      "url": "https://jszyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:57.523147Z",
+      "catalogMs": 2386,
+      "searchMs": 1552,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "虎牙资源",
+      "url": "https://www.huyaapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:57.173338Z",
+      "catalogMs": 1923,
+      "searchMs": 1382,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "新浪资源",
+      "url": "https://api.xinlangapi.com/xinlangapi.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:58.611427Z",
+      "catalogMs": 1785,
+      "searchMs": 1547,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "速播资源",
+      "url": "https://subocaiji.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:03.052907Z",
+      "catalogMs": 2455,
+      "searchMs": 2380,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "光速资源",
+      "url": "https://api.guangsuapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:05.093494Z",
+      "catalogMs": 3517,
+      "searchMs": 2377,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "电影天堂",
+      "url": "http://caiji.dyttzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:04.957020Z",
+      "catalogMs": 1406,
+      "searchMs": 1630,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "360资源",
+      "url": "https://360zy.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:36:59.909254Z",
+      "catalogMs": 784,
+      "searchMs": 602,
+      "searchCount": 3,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "暴风资源",
+      "url": "https://bfzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:06.867526Z",
+      "catalogMs": 3159,
+      "searchMs": 1186,
+      "searchCount": 7,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "百度云zy",
+      "url": "https://api.apibdzy.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:08.411115Z",
+      "catalogMs": 2281,
+      "searchMs": 3448,
+      "searchCount": 2,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "U酷影视",
+      "url": "https://api.ukuapi88.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:09.736896Z",
+      "catalogMs": 2051,
+      "searchMs": 3210,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "最大资源",
+      "url": "https://api.zuidapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:12.782409Z",
+      "catalogMs": 2275,
+      "searchMs": 2275,
+      "searchCount": 7,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "魔都资源（备用接口）",
+      "url": "https://caiji.moduapi.cc/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:18.043662Z",
+      "catalogMs": 6368,
+      "searchMs": 1914,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jyzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:12.720846Z",
+      "catalogMs": 2512,
+      "searchMs": 2781,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jinyingzy.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:12.849612Z",
+      "catalogMs": 1479,
+      "searchMs": 2548,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "红牛资源（备用接口）",
+      "url": "https://www.hongniuzy2.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:13.431359Z",
+      "catalogMs": 1891,
+      "searchMs": 1183,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "非凡资源（备用接口）",
+      "url": "https://cj.ffzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:18.328282Z",
+      "catalogMs": 2937,
+      "searchMs": 863,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "虎牙资源（备用接口）",
+      "url": "https://www.huyaapi.com/api.php/provide/vod/at/json",
+      "checkedAt": "2026-10-21T09:37:21.139951Z",
+      "catalogMs": 3266,
+      "searchMs": 2472,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "新浪资源（备用接口）",
+      "url": "http://api.xinlangapi.com/xinlangapi.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:17.406489Z",
+      "catalogMs": 1186,
+      "searchMs": 1048,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "量子资源（备用接口）",
+      "url": "http://cj.lziapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:19.464666Z",
+      "catalogMs": 1987,
+      "searchMs": 513,
+      "searchCount": 7,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "非凡资源（备用接口）",
+      "url": "http://cj.ffzyapi.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:20.338512Z",
+      "catalogMs": 1882,
+      "searchMs": 580,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "360资源（备用接口）",
+      "url": "https://360zyzz.com/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:23.995319Z",
+      "catalogMs": 1431,
+      "searchMs": 1322,
+      "searchCount": 3,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "最大资源（备用接口）",
+      "url": "http://zuidazy.me/api.php/provide/vod",
+      "checkedAt": "2026-10-21T09:37:27.224233Z",
+      "catalogMs": 1846,
+      "searchMs": 1786,
+      "searchCount": 7,
+      "ok": true,
+      "sampleSegmentReachable": true
+    },
+    {
+      "name": "天涯资源",
+      "url": "https://tyyszy.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:21.794979Z",
+      "catalogMs": 2206,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "天涯影视",
+      "url": "https://tyyszyapi.com/api.php/provide/vod/?ac=list",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:22.589134Z",
+      "catalogMs": 1973,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "旺旺资源",
+      "url": "https://api.wwzy.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:30.394998Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 113] No route to host>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "TV-旺旺短剧",
+      "url": "https://wwzy.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:31.195947Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 113] No route to host>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "天涯影视",
+      "url": "https://tyyszyapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:25.785552Z",
+      "catalogMs": 2776,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "樱花资源",
+      "url": "https://m3u8.apiyhzy.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:26.197438Z",
+      "catalogMs": 2517,
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "🔅樱花资源ᴴ",
+      "url": "https://yhzy.cc/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:46.242220Z",
+      "catalogMs": 2059,
+      "searchMs": 1474,
+      "searchCount": 4,
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>; <urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "快车资源阿",
+      "url": "https://caiji.kuaichezy.org/api.php/provide",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:27.093295Z",
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "华为吧1",
+      "url": "https://huawei8.live/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:36.220959Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 113] No route to host>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "优质资源",
+      "url": "https://api.yzzy-api.com/inc/apijson.php",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:37.110978Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 113] No route to host>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "TV-1080资源库",
+      "url": "https://api.1080zyku.com/inc/api_mac10.php",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:27.602224Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "1080资源",
+      "url": "https://api.1080zyku.com/inc/apijson.php",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:28.053719Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "优质资源库",
+      "url": "https://api.yzzy-api.com/inc/ldg_api_all.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:38.070961Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 113] No route to host>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "如意资源",
+      "url": "https://cj.rycjapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:30.626062Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "如意资源",
+      "url": "http://cj.rycjapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:30.730196Z",
+      "ok": false,
+      "error": "[Errno 104] Connection reset by peer",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "豆瓣资源",
+      "url": "https://dbzy.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:34.488738Z",
+      "catalogMs": 2553,
+      "ok": false,
+      "error": "invalid search",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "快车资源",
+      "url": "https://caiji.kuaichezy.org/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:34.383184Z",
+      "catalogMs": 2091,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "闪电资源",
+      "url": "https://xsd.sdzyapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:38.532757Z",
+      "catalogMs": 1696,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "TV-闪电资源",
+      "url": "https://sdzyapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:38.181366Z",
+      "catalogMs": 2383,
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "华为吧资源",
+      "url": "https://cjhwba.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:37.122986Z",
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "豆瓣资源",
+      "url": "https://caiji.dbzy5.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:43.580858Z",
+      "catalogMs": 4102,
+      "ok": false,
+      "error": "invalid search",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "TV-淘片资源",
+      "url": "https://taopianapi.com/cjapi/mc10/vod/json.html",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:38.018219Z",
+      "ok": false,
+      "error": "<urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed (_ssl.c:877)>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "无尽资源",
+      "url": "https://api.wujinapi.me/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:43.750423Z",
+      "catalogMs": 2333,
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "无尽影视",
+      "url": "https://api.wujinapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:51.626168Z",
+      "catalogMs": 4418,
+      "searchMs": 2615,
+      "searchCount": 5,
+      "ok": true,
+      "sampleSegmentReachable": true,
+      "sampleVideo": {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 504
+      }
+    },
+    {
+      "name": "索尼资源",
+      "url": "https://suoniapi.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:43.021425Z",
+      "catalogMs": 2466,
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "无尽资源4",
+      "url": "https://api.wujinapi.cc/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:44.199519Z",
+      "catalogMs": 4730,
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "无尽资源3",
+      "url": "https://api.wujinapi.net/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:46.611852Z",
+      "catalogMs": 2499,
+      "ok": false,
+      "error": "HTTP Error 403: Forbidden",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "茅台资源",
+      "url": "https://caiji.maotaizy.cc/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "checkedAt": "2026-10-21T09:37:50.453040Z",
+      "catalogMs": 5157,
+      "ok": false,
+      "error": "invalid search",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "卧龙资源",
+      "url": "https://wolongzyw.com/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:06.984647Z",
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "iKun资源",
+      "url": "https://ikunzyapi.com/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:06.510538Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "猫眼资源",
+      "url": "https://api.maoyanapi.top/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:26.608276Z",
+      "catalogMs": 1939,
+      "searchMs": 1951,
+      "searchCount": 3,
+      "ok": true,
+      "sampleSegmentReachable": true,
+      "sampleVideo": {}
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lzcaiji.com/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:06.475128Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "卧龙影视",
+      "url": "https://collect.wolongzyw.com/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:08.260117Z",
+      "ok": false,
+      "error": "Expecting value: line 1 column 1 (char 0)",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "最大点播",
+      "url": "https://zuidazy.me/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:07.008386Z",
+      "ok": false,
+      "error": "<urlopen error [Errno 104] Connection reset by peer>",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "金鹰资源",
+      "url": "https://jyzyapi.com/provide/vod/from/jinyingyun/at/json",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:13.559281Z",
+      "catalogMs": 1917,
+      "searchMs": 3263,
+      "searchCount": 5,
+      "ok": false,
+      "error": "no HLS sample",
+      "sampleSegmentReachable": false
+    },
+    {
+      "name": "飘零资源",
+      "url": "https://p2100.net/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:18.486912Z",
+      "catalogMs": 1845,
+      "searchMs": 2311,
+      "searchCount": 4,
+      "ok": true,
+      "sampleSegmentReachable": true,
+      "sampleVideo": {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 504
+      }
+    },
+    {
+      "name": "山海资源",
+      "url": "https://zy.sh0o.cn/api.php/provide/vod",
+      "origin": "https://github.com/Wolfun/luna-moon-tv-api",
+      "checkedAt": "2026-10-21T09:59:08.430984Z",
+      "ok": false,
+      "error": "<urlopen error [Errno -2] Name or service not known>",
+      "sampleSegmentReachable": false
+    }
+  ]
+}

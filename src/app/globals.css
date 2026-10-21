@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 /*
  * 语义化配色（RGB 三元组，供 Tailwind 以 <alpha-value> 注入透明度）：
  * 深色主题沿用旧版 LibreTV 配色；浅色主题为对应的白底变体。
