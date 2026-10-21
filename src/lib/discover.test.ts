@@ -8,4 +8,8 @@ describe('discovery metadata', () => {
     expect(normalizeDiscoverItem({ id: 'a', title: '测试', moviecategory: ['伦理'] }, 'movie')).toBeUndefined();
     expect(normalizeDiscoverItem({ id: 'b', title: '测试', cover: 'javascript:alert(1)' }, 'tv')?.cover).toBe('');
   });
+  it('keeps verified independent selections out of ordinary discovery without blocking a remake', () => {
+    expect(normalizeDiscoverItem({ id: 'film', title: '步履不停', pubdate: '2008-06-28' }, 'movie')).toBeUndefined();
+    expect(normalizeDiscoverItem({ id: 'other', title: '步履不停', pubdate: '2026-01-01' }, 'movie')).toBeDefined();
+  });
 });

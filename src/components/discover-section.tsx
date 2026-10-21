@@ -2,19 +2,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from './auth';
 import { SmartImage } from './smart-image';
 import { useAppStore } from '@/lib/store';
 import { api } from '@/lib/client-api';
 import type { DiscoverItem, DiscoverResult, DiscoverKind } from '@/lib/discover';
 import { cn } from '@/lib/utils';
+import { useFilmPreview } from './film-preview';
 
 const TABS = [{ id: 'hot', label: '热门推荐' }, { id: 'movie', label: '电影' }, { id: 'tv', label: '剧集' }, { id: 'anime', label: '动漫' }, { id: 'variety', label: '综艺' }, { id: 'rank', label: '排行榜' }] as const;
 type Tab = typeof TABS[number]['id'];
 const GENRES: Record<DiscoverKind, string[]> = { hot: ['剧情','喜剧','爱情','悬疑'], movie: ['剧情','喜剧','爱情','动作','科幻','悬疑','犯罪','战争','动画','纪录片'], tv: ['剧情','喜剧','言情','悬疑','都市','古装','军事','警匪'], anime: ['热血','冒险','搞笑','科幻','亲子'], variety: ['真人秀','访谈','脱口秀','音乐','搞笑'] };
 const RANKS = [{ id: 'douban_movie_weekly', label: '电影周榜' }, { id: 'douban_tv_chinese', label: '国产剧周榜' }, { id: 'douban_tv_global', label: '海外剧周榜' }, { id: 'douban_show_chinese', label: '国内综艺' }, { id: 'douban_show_global', label: '海外综艺' }, { id: 'baidu_teleplay', label: '热播剧榜' }];
 
-export function DiscoverSection({ onPick }: { onPick: (title: string) => void }) {
+export function DiscoverSection() {
   const params = useSearchParams();
   const { verified, openLogin } = useAuth();
   const [tab, setTab] = useState<Tab>(params.get('view') === 'rank' ? 'rank' : 'hot');
@@ -52,7 +54,7 @@ export function DiscoverSection({ onPick }: { onPick: (title: string) => void })
   const currentYear = new Date().getFullYear();
   return <section id="discover" className="discovery" aria-label="发现影视">
     <div className="discovery-heading"><div><h2>{tab === 'rank' ? '大家都在看' : '发现好故事'}</h2><p>{tab === 'rank' ? '跟着榜单，遇见下一部好剧。' : '总有一部，值得一起看。'}</p></div><span className="hidden sm:block text-xs text-faint">{tab === 'rank' ? '真实榜单 · 定时更新' : '电影与剧集 · 慢慢挑，慢慢看'}</span></div>
-    <div className="discovery-tabs" role="tablist" aria-label="影视分类">{TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={cn(tab === t.id && 'active')} onClick={() => changeTab(t.id)}>{t.label}</button>)}</div>
+    <div className="discovery-tabs"><div className="discovery-tab-buttons" role="tablist" aria-label="影视分类">{TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={cn(tab === t.id && 'active')} onClick={() => changeTab(t.id)}>{t.label}</button>)}</div><Link href="/collection">三级／伦理 ↗</Link></div>
     {tab === 'rank' ? <div className="discovery-filters">{RANKS.map((r) => <button key={r.id} className={cn('filter-chip', rank === r.id && 'active')} aria-pressed={rank === r.id} onClick={() => setRank(r.id)}>{r.label}</button>)}</div> : <>
       {tab === 'anime' && <div className="flex gap-2 my-3"><button className={cn('filter-chip', !calendar && 'active')} onClick={() => setCalendar(false)}>动漫片库</button><button className={cn('filter-chip', calendar && 'active')} onClick={() => setCalendar(true)}>本周新番 · Bangumi</button></div>}
       {!calendar && <div className="discovery-filters">
@@ -66,16 +68,17 @@ export function DiscoverSection({ onPick }: { onPick: (title: string) => void })
       : query.isLoading ? <div className="poster-grid" aria-label="正在加载影片">{Array.from({ length: 12 }, (_, i) => <div key={i} className="aspect-[2/3] rounded-lg bg-chip animate-pulse" />)}</div>
       : query.isError && !items.length ? <div className="cinema-empty" role="alert"><h3>片单暂时没有送达</h3><p>{query.error instanceof Error ? query.error.message : '请稍后重试；你仍然可以搜索影片。'}</p><button className="btn-ghost" onClick={() => void query.refetch()}>重新加载</button></div>
       : !items.length ? <div className="cinema-empty"><h3>这个组合暂时没有影片</h3><p>试试其他类型、地区或年代。</p><button className="btn-ghost" onClick={() => { setGenre(''); setArea(''); setYear(''); }}>重置筛选</button></div>
-      : <><div className="poster-grid">{items.map((item, index) => <Poster key={item.id} item={item} rank={tab === 'rank' ? index + 1 : undefined} onPick={onPick} />)}</div>
+      : <><div className="poster-grid">{items.map((item, index) => <Poster key={item.id} item={item} rank={tab === 'rank' ? index + 1 : undefined} />)}</div>
       {tab !== 'rank' && !calendar && catalogue.hasNextPage && <div className="load-more"><button className="btn-ghost" disabled={catalogue.isFetchingNextPage} onClick={() => void catalogue.fetchNextPage()}>{catalogue.isFetchingNextPage ? '正在寻找更多好故事…' : catalogue.isFetchNextPageError ? '加载失败，重试' : '加载更多影片'}</button></div>}
       <p className="catalog-credit">{tab === 'rank' ? '榜单来自豆瓣 / 百度，经 60s API 提供' : calendar ? '放送信息来自 Bangumi' : '片单信息来自 360 影视 · 影片是否可播以搜索结果为准'}</p></>}
   </section>;
 }
-function Poster({ item, rank, onPick }: { item: DiscoverItem; rank?: number; onPick: (title: string) => void }) {
+function Poster({ item, rank }: { item: DiscoverItem; rank?: number }) {
+  const open = useFilmPreview();
   const mode = useAppStore((s) => s.imageProxyMode);
   const customProxy = useAppStore((s) => s.customImageProxy);
-  return <button className="poster-card" onClick={() => onPick(item.title)} aria-label={`搜索 ${item.title}`}>
-    <div className="poster-art"><span className="poster-placeholder" aria-hidden>{item.title.slice(0, 1)}</span><SmartImage url={item.cover} mode={mode} customProxy={customProxy} alt={item.title} className="poster-image" />{item.rating && <span className="poster-rating">{item.rating}</span>}{rank && <span className="poster-rank">{String(rank).padStart(2, '0')}</span>}<span className="poster-hover" aria-hidden>搜索片源 ↗</span></div>
+  return <button className="poster-card" onClick={() => open({ ...item, provider: item.provider || '360', providerId: item.providerId || item.id, kind: item.kind === 'hot' ? 'movie' : item.kind })} aria-label={`查看 ${item.title}`}>
+    <div className="poster-art"><span className="poster-placeholder" aria-hidden>{item.title.slice(0, 1)}</span><SmartImage url={item.cover} mode={mode} customProxy={customProxy} alt={item.title} className="poster-image" />{item.rating && <span className="poster-rating">{item.rating}</span>}{rank && <span className="poster-rank">{String(rank).padStart(2, '0')}</span>}<span className="poster-hover" aria-hidden>查看详情 ↗</span></div>
     <h3>{item.title}</h3><p>{[item.year, item.area || ({ movie: '电影', tv: '剧集', anime: '动漫', variety: '综艺', hot: '' }[item.kind]), item.remarks || item.genre].filter(Boolean).join(' · ') || '点开寻找播放线路'}</p>
   </button>;
 }

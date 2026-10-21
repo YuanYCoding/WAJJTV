@@ -7,6 +7,9 @@
 - 豆瓣/百度榜单与 Bangumi 本周放送。
 - 多源并发流式搜索、备用接口去重；失效源暂时隔离，后台复检成功后恢复。
 - 沿用 LibreTV 播放器、观看历史、收藏、直播与配置格式。
+- 共享登录、海清与静静两个档案；想看、看过、不感兴趣和共同片单跨设备同步。
+- 影片详情预览与“今晚看什么”：双方共同想看优先，候选实时共享，换一批不修改偏好。
+- 带可追溯分类依据的独立剧情伦理／香港 III 级精选。
 
 ## 本地运行
 
@@ -28,6 +31,8 @@ npm run build
 ## 部署说明
 
 [当前部署、探测频率与回滚](docs/operations.md) · [源实测记录](docs/source-audit.json) · [新增来源订阅](docs/verified-additions.json) · [设计约定](docs/design.md)
+
+[双人片单、数据接口与 V2 部署说明](docs/shared-library.md)。V2 需要持久化数据库目录；容器采用 Debian Bookworm 的 Node 22，Compose 示例已包含数据卷。`SITE_ORIGIN` 必须与浏览器访问的网站 origin 一致。
 
 完整的播放器、直播、订阅和环境变量说明见 [上游文档](https://github.com/LibreSpark/LibreTV#readme)。片单数据与播放线路来自不同提供方，能发现影片并不保证有可用播放线路；源的可用性和清晰度随具体影片及网络变化。
 

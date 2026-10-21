@@ -46,6 +46,14 @@ export interface VideoDetail {
 }
 
 export interface DoubanItem {
+  area?: string;
+  genre?: string;
+  provider?: 'douban' | 'bangumi' | 'baidu';
+  providerId?: string;
+  year?: string;
+  synopsis?: string;
+  actors?: string[];
+  directors?: string[];
   id: string;
   title: string;
   cover: string;

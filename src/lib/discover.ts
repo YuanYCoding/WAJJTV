@@ -1,8 +1,10 @@
 import { fetchUpstream, getCache, setCache } from './fetch-utils';
+import { curatedMatch } from './curated-films';
+import type { FilmProvider } from './library-types';
 
 export const DISCOVER_KINDS = ['hot', 'movie', 'tv', 'anime', 'variety'] as const;
 export type DiscoverKind = typeof DISCOVER_KINDS[number];
-export interface DiscoverItem { id: string; title: string; cover: string; rating?: string; year?: string; area?: string; genre?: string; remarks?: string; kind: DiscoverKind }
+export interface DiscoverItem { id: string; title: string; cover: string; rating?: string; year?: string; area?: string; genre?: string; remarks?: string; kind: DiscoverKind; provider?: FilmProvider; providerId?: string; synopsis?: string; actors?: string[]; directors?: string[]; durationMinutes?: number }
 export interface DiscoverResult { items: DiscoverItem[]; total: number; hasMore: boolean; provider: string }
 export interface DiscoverFilters { kind: DiscoverKind; page: number; genre: string; area: string; year: string; sort: string }
 const CATEGORIES = { movie: 1, tv: 2, variety: 3, anime: 4 };
@@ -19,7 +21,9 @@ export function normalizeDiscoverItem(raw: unknown, kind: DiscoverKind): Discove
   if (cover.startsWith('//')) cover = 'https:' + cover;
   if (!/^https?:\/\//.test(cover)) cover = '';
   const rating = Number(v.doubanscore || v.score);
-  return { id: `${kind}:${v.id}`, title, cover, rating: rating > 0 && rating <= 10 ? rating.toFixed(1) : undefined, year: text(v.pubdate || v.year).slice(0, 4), area: join(v.area), genre, remarks: v.upinfo ? `更新至 ${v.upinfo} 集` : text(v.tag), kind };
+  const year = text(v.pubdate || v.year).slice(0, 4);
+  if (kind !== 'hot' && curatedMatch({ provider: '360', providerId: String(v.id), title, year, kind })) return undefined;
+  return { id: `${kind}:${v.id}`, provider: '360', providerId: String(v.id), title, cover, rating: rating > 0 && rating <= 10 ? rating.toFixed(1) : undefined, year, area: join(v.area), genre, remarks: v.upinfo ? `更新至 ${v.upinfo} 集` : text(v.tag), kind, synopsis: text(v.description || v.comment), actors: Array.isArray(v.actor) ? v.actor.map(text).filter(Boolean) : [], directors: Array.isArray(v.director) ? v.director.map(text).filter(Boolean) : [] };
 }
 export async function fetchDiscover(filters: DiscoverFilters): Promise<DiscoverResult> {
   const key = `discover:${JSON.stringify(filters)}`;

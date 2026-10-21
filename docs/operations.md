@@ -3,11 +3,12 @@
 ## 当前部署
 
 - 基线：LibreTV 2.16.12，原容器 `libretv`，`127.0.0.1:18080`。
-- 新版：基于 LibreTV 2.19.7，版本 `2.19.7-wajjtv.1`，`wajjtv:20261021`，`127.0.0.1:18081`。
+- 当前新版：基于 LibreTV 2.19.7，版本 `2.19.7-wajjtv.2`，镜像 `wajjtv:v2-20261021`，容器 `wajjtv-v2`，`127.0.0.1:18082`。
+- 升级前 WAJJTV v1：容器 `wajjtv`，`127.0.0.1:18081`，保留用于本次回滚。
 - 域名：`https://zhuiju.zhaxueit.cn/`，由 Nginx 转发；保留流式响应的 `proxy_buffering off`。
-- 新配置：`/opt/wajjtv/.env`。沿用原访问密码；不要提交到仓库。
-- 私人插画：`/opt/wajjtv/private/mascots.png`，只读挂载到 `/app/private`，需登录访问 `/api/couple-art`。
-- 健康状态：`/opt/wajjtv/data/source-health.json`，挂载到 `/app/data`，容器用户需要写权限。
+- 新配置：`/opt/wajjtv-v2/.env`。沿用原访问密码，增加 `SITE_ORIGIN`；不要提交到仓库。
+- 私人插画：`/opt/wajjtv-v2/private/mascots.png`，只读挂载到 `/app/private`，需登录访问 `/api/couple-art`。
+- 健康状态与片单数据库：`/opt/wajjtv-v2/data` 挂载到 `/app/data`，容器用户 UID/GID 1001 需要写权限。
 - 历史记录与偏好沿用原 IndexedDB / localStorage 名称，保留原有用户数据兼容性。
 
 ## 回滚
@@ -15,12 +16,14 @@
 在服务器执行：
 
 ```sh
-sh /opt/wajjtv/rollback.sh
+sh /opt/wajjtv-v2/rollback.sh
 ```
 
-该脚本检查原容器、恢复原域名的 Nginx 配置、验证配置后平滑重载。原容器和原部署目录保留，因此无需重建原版。
+该脚本检查 WAJJTV v1 容器、恢复域名转发到 18081、验证配置后平滑重载。V2 数据库保留，不会因回滚删除。更早的 `/opt/wajjtv/rollback.sh` 用于恢复原始 LibreTV 2.16.12，不是本次升级的默认回滚入口。
 
-备份目录：`/opt/backups/wajjtv-before-20261021-171816`，包含运行镜像、原部署目录、Nginx 配置、容器参数和校验和。运行镜像另有本地副本；备份内含私密配置，应限制访问。
+本次备份：`/opt/backups/wajjtv-v1-before-v2-20261021-194353`，包含当前 v1 镜像、部署配置、私人素材、数据、TLS、Nginx、源代码归档和校验和。已从归档恢复到隔离的 18083 端口，验证 v1 状态、32 个来源配置及图片文件权限，恢复演练容器随后已移除。
+
+更早的 LibreTV 原版备份仍在 `/opt/backups/wajjtv-before-20261021-171816`。备份含私密配置，不上传公共仓库。
 
 ## 源健康规则
 
@@ -55,6 +58,6 @@ npm test
 npm run build
 ```
 
-标准 Dockerfile 可用于独立重建。当前 2GB 服务器采用隔离构建容器、单构建 worker、限制内存与 CPU，避免影响其他服务。发布先绑定 `127.0.0.1:18081` 验证，再切换 Nginx；不要同时给两个容器绑定同一端口。
+标准 Dockerfile 可用于独立重建。当前 2GB 服务器采用隔离构建容器、单构建 worker、限制内存与 CPU。V2 发布先绑定 `127.0.0.1:18082` 验证，再切换 Nginx；不要同时给两个容器绑定同一端口。运行环境和 SQLite 说明见 [双人片单文档](shared-library.md)。
 
 私密文件从 `.gitignore` 和 `.dockerignore` 排除；公开源码保留 LibreTV 署名与 AGPL-3.0 许可证。

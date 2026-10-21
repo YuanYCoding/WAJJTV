@@ -31,7 +31,7 @@ export default function AboutPage() {
         <section>
           <h2 className="text-base font-semibold text-content mb-2.5">隐私与数据</h2>
           <p className="text-sm text-muted leading-relaxed">
-            你的搜索历史、观看进度等数据仅保存在本设备浏览器中（IndexedDB），不会上传到服务器。
+            搜索历史和播放进度保存在当前设备的浏览器中；双人片单、选片偏好和当天候选保存在服务器，用于海清和静静之间及多设备同步。
             聚合搜索由服务器转发；封面与视频直连时，上游服务可能接收到你的网络地址。双人插画受登录保护，未包含在公开源码中。
           </p>
         </section>
