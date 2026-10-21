@@ -597,7 +597,12 @@
       "searchCount": 3,
       "ok": true,
       "sampleSegmentReachable": true,
-      "sampleVideo": {}
+      "sampleVideo": {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 3840,
+        "height": 1608
+      }
     },
     {
       "name": "量子资源",
