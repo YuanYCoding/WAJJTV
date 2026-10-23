@@ -9,6 +9,9 @@ import { GlobalDownloadManager } from './download-manager';
 import { useAppStore, hydrateLiveProbeResults } from '@/lib/store';
 import { api, STATUS_QUERY_KEY } from '@/lib/client-api';
 import { applyEnvPresets } from '@/lib/subscription-sync';
+import { SourceHealthMonitor } from './source-health-monitor';
+import { ProfileProvider } from './profile-context';
+import { FilmPreviewProvider } from './film-preview';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -50,7 +53,7 @@ export function Providers({ children }: { children: ReactNode }) {
           {/* 全站常驻：下载事件监听（enqueueDownload）依赖它存在——
               挂在 Header 里会让 /watch 等不渲染 Header 的页面派发的事件凭空丢失 */}
           <GlobalDownloadManager />
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider><ProfileProvider><FilmPreviewProvider><SourceHealthMonitor />{children}</FilmPreviewProvider></ProfileProvider></AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -76,6 +76,7 @@ export async function fetchDoubanRecommend(
   if (!raw) throw new Error('豆瓣推荐获取失败');
 
   const items: DoubanItem[] = raw.map((s) => ({
+    provider: 'douban', providerId: s.id,
     id: s.id,
     title: s.title,
     cover: s.cover,

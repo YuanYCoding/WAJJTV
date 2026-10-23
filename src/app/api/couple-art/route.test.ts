@@ -1,0 +1,22 @@
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { afterEach, expect, it, vi } from 'vitest';
+import { GET } from './route';
+import { signSession, SESSION_COOKIE } from '@/lib/auth';
+let dir: string;
+afterEach(() => { vi.unstubAllEnvs(); if (dir) rmSync(dir, { recursive: true, force: true }); });
+it('private artwork caches bytes and validates login even for a matching ETag', async () => {
+  dir = mkdtempSync(join(tmpdir(), 'wajjtv-art-')); writeFileSync(join(dir, 'mascots.png'), 'test-art');
+  vi.stubEnv('PRIVATE_ASSETS_DIR', dir); vi.stubEnv('PASSWORD', 'test-art');
+  const { token } = signSession(); const cookie = `${SESSION_COOKIE}=${token}`;
+  const initial = await GET(new Request('https://cinema.test/api/couple-art', { headers: { cookie } }));
+  expect(initial.headers.get('cache-control')).toBe('private, no-cache');
+  const etag = initial.headers.get('etag')!;
+  const next = await GET(new Request('https://cinema.test/api/couple-art', { headers: { cookie, 'If-None-Match': etag } }));
+  expect(next.status).toBe(304); expect(await next.text()).toBe('');
+  expect((await GET(new Request('https://cinema.test/api/couple-art', { headers: { 'If-None-Match': etag } }))).status).toBe(401);
+  writeFileSync(join(dir, 'mascots.png'), 'updated-artwork');
+  const updated = await GET(new Request('https://cinema.test/api/couple-art', { headers: { cookie, 'If-None-Match': etag } }));
+  expect(updated.status).toBe(200); expect(updated.headers.get('etag')).not.toBe(etag);
+});

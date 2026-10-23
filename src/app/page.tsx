@@ -4,7 +4,9 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
-import { RecommendSection } from '@/components/douban-section';
+import { DiscoverSection } from '@/components/discover-section';
+import { CoupleMascots } from '@/components/couple-mascots';
+import { sourceIdentity } from '@/lib/source-health';
 import { DetailModal } from '@/components/detail-modal';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
 import { useAppStore, resolveSource, isInDisabledSubscription, isSourceDisabled } from '@/lib/store';
@@ -67,9 +69,13 @@ function HomeContent() {
     const seen = new Set<string>();
     return selectedKeys
       .map((key) => resolveSource({ customAPIs, envSources }, key))
+      .sort((a, b) => {
+        const x = sourceHealth[a?.key || '']; const y = sourceHealth[b?.key || ''];
+        return (x?.ok ? x.ms ?? 1e9 : 1e9) - (y?.ok ? y.ms ?? 1e9 : 1e9);
+      })
       .filter((s): s is NonNullable<typeof s> => {
-        if (!s || !validateSourceUrl(s.url) || seen.has(s.key)) return false;
-        seen.add(s.key);
+        if (!s || !validateSourceUrl(s.url) || isSourceDisabled({ sourceHealth }, s.key) || isInDisabledSubscription({ subscriptions }, s.key) || seen.has(sourceIdentity(s.url))) return false;
+        seen.add(sourceIdentity(s.url));
         return true;
       })
       // 自动停用期内的源不参与搜索（到期自动恢复）
@@ -91,15 +97,18 @@ function HomeContent() {
   );
 
   const searchQuery = useQuery({
-    queryKey: ['search', urlQuery, selectedKeys, yellowFilter],
+    // 源配置异步加载后须换键；否则直接打开搜索链接会把“尚无配置”缓存成五分钟空结果。
+    queryKey: ['search', urlQuery, selectedKeys, yellowFilter, envSources, customAPIs],
     // 与 runSearch 的截断规则保持一致：顶栏搜索 / 手动构造长链接不会绕过上限
     queryFn: ({ signal }) => {
       setStreamedOutcomes([]);
+      if (!selectedSources.length) return Promise.resolve({ list: [], failures: [] });
       return api.search(urlQuery.slice(0, 100), selectedSources, yellowFilter, {
         signal,
         // 逐源结算即更新：结果边搜边渲染，同时滚动健康度
         onSource: (outcome) => {
-          setStreamedOutcomes((prev) => [...prev, outcome]);
+          setStreamedOutcomes((prev) => [...prev.filter((item) => item.sourceKey !== outcome.sourceKey), outcome]);
+          if (outcome.partial || outcome.cached) return;
           for (const ev of useAppStore.getState().recordSourceHealth([outcome])) {
             toast(
               ev.permanent
@@ -112,6 +121,7 @@ function HomeContent() {
       });
     },
     enabled: Boolean(urlQuery) && selectedSources.length > 0,
+    retry: false,
     // 5 分钟内从播放页返回时直接使用缓存，不重新搜索（服务端另有 60s 结果缓存兜底）
     staleTime: 300_000,
   });
@@ -167,29 +177,19 @@ function HomeContent() {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      <main className="relative flex-1 max-w-6xl w-full mx-auto px-4 py-6">
-        {/* 首屏氛围渐变 */}
-        {!urlQuery && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-[420px] -z-10"
-            style={{
-              background:
-                'radial-gradient(60% 60% at 50% 0%, rgba(35,173,229,0.10) 0%, rgba(35,173,229,0.03) 45%, transparent 75%)',
-            }}
-          />
-        )}
-
+      <main className="cinema-shell flex-1 w-full mx-auto">
         {/* 搜索区 */}
-        <section className={cn('flex flex-col items-center', urlQuery ? 'mb-6' : 'mt-8 mb-8')}>
+        <section className={cn('home-search', urlQuery ? 'compact-search' : 'cinema-hero')}>
+          {!urlQuery && <CoupleMascots />}
           {!urlQuery && (
-            <header className="text-center mb-6">
-              <h1 className="text-4xl sm:text-5xl font-bold brand-gradient">LibreTV</h1>
+            <header className="hero-copy">
+              <h1>今晚，和你一起看<span>。</span></h1>
+              <p>海清和静静自用追剧资源</p>
             </header>
           )}
-          {urlQuery && <h1 className="sr-only">LibreTV 视频搜索</h1>}
+          {urlQuery && <h1 className="sr-only">WAJJTV 视频搜索</h1>}
           {/* 定位容器比胶囊宽一圈：浮层按它的宽度对齐，接缝处不会与胶囊边框错位 1px */}
-          <div ref={searchHistory.containerRef} className="relative w-full max-w-2xl">
+          <div ref={searchHistory.containerRef} className="hero-search-box relative w-full">
             <form
               className="w-full"
               onSubmit={(e) => {
@@ -204,7 +204,7 @@ function HomeContent() {
                   // 12px 圆角矩形（非胶囊）：收起态与展开态共用同一组上圆角，
                   // 展开时输入框这部分形状完全不发生变化，上下圆角也与下拉保持一致；
                   // 右侧与上下不留内边距，由搜索按钮拉伸填满、与搜索框边缘贴合
-                  'flex items-stretch min-h-12 pl-4 border',
+                  'flex items-stretch min-h-14 pl-4 border',
                   'transition-[background-color,border-color,border-radius] duration-200',
                   searchHistory.visible
                     ? // 展开时：外框（含上圆角）沿用输入框的聚焦样式不变，只把底边改为内部分隔线，
@@ -216,7 +216,7 @@ function HomeContent() {
                 <input
                   ref={inputRef}
                   className="flex-1 min-w-0 pr-2 bg-transparent text-sm text-content placeholder:text-faint focus:outline-none"
-                  placeholder="输入影片名称..."
+                  placeholder="电影、剧集，搜你想看的"
                   value={input}
                   maxLength={100}
                   onChange={(e) => {
@@ -288,7 +288,7 @@ function HomeContent() {
                 “<span className="text-content">{urlQuery}</span>” 的搜索结果
                 {isSearching ? (
                   <span className="text-faint">
-                    （已就绪 {streamedOutcomes.length}/{selectedSources.length} 个源…）
+                    （已完成 {streamedOutcomes.filter((o) => !o.partial).length}/{selectedSources.length} 个源，先到先看…）
                   </span>
                 ) : (
                   searchQuery.data && (
@@ -300,6 +300,7 @@ function HomeContent() {
               </h2>
             </div>
 
+            {searchQuery.isError && <p role="alert" className="mb-4 text-warning">搜索服务暂时不可用，请重试。<button className="btn-ghost ml-2" onClick={() => void searchQuery.refetch()}>重试</button></p>}
             {failures.length > 0 && (
               <div className="mb-3 text-xs bg-chip rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-1">
                 <span className="text-faint">{isSearching ? '以下源暂时无响应：' : '部分点播源请求失败：'}</span>
@@ -314,8 +315,7 @@ function HomeContent() {
 
             {disabledSources.length > 0 && (
               <div className="mb-3 text-xs text-faint bg-chip rounded-lg px-3 py-2">
-                {disabledSources.length} 个源因连续超时/失败已暂停参与搜索（临时停用的到期自动恢复，
-                长期停用的需在设置中手动恢复）：{disabledSources.map((key) => sourceName(key)).join('、')}
+                {disabledSources.length} 个源因连续超时/失败已暂停参与搜索（后台定期复检，成功后自动恢复）：{disabledSources.map((key) => sourceName(key)).join('、')}
               </div>
             )}
 
@@ -366,12 +366,7 @@ function HomeContent() {
 
         {/* 首页推荐（有搜索时隐藏） */}
         {!urlQuery && (
-          <RecommendSection
-            onPick={(title) => {
-              setInput(title);
-              runSearch(title);
-            }}
-          />
+          <DiscoverSection />
         )}
       </main>
 
@@ -410,7 +405,7 @@ function NoSourceGuide({ hasSources = false }: { hasSources?: boolean }) {
           <>点击右上角「设置」，勾选要参与搜索的点播源后重新搜索。</>
         ) : (
           <>
-            LibreTV 不内置任何采集站。点击右上角「设置 → 添加 API」，填入一个
+            WAJJTV 支持配置自己的点播源。点击右上角「设置 → 添加 API」，填入一个
             Apple CMS 采集站地址（如 <code className="text-accent text-xs">https://example.com/api.php/provide/vod</code>），
             勾选后即可开始搜索。
           </>

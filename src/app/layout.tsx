@@ -1,30 +1,25 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import './cinema.css';
+import './library.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'LibreTV - 免费在线视频搜索与观看平台',
-    template: '%s - LibreTV',
+    default: 'WAJJTV · 海清和静静的私人影院',
+    template: '%s - WAJJTV',
   },
   description:
-    'LibreTV 是一个免费的在线视频搜索平台，无广告、安全，提供来自多个视频源的内容搜索与观看服务，无需注册即可使用。',
+    '海清和静静自用追剧资源。一起发现好电影、好剧集，收藏每一段共度的时光。',
   manifest: '/manifest.webmanifest',
   // 图标与门户站（LibreTV-portal）同一套：同一张 artwork 导出的多尺寸 + 根目录 favicon.ico 兜底。
   // 只声明单张 512 时，抓取端只能拿大图缩放，小尺寸下易糊、看起来「没填满」。
-  icons: {
-    icon: [
-      { url: '/favicon.ico', sizes: '48x48' },
-      { url: '/icons/icon-96.png', sizes: '96x96', type: 'image/png' },
-      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-    ],
-    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
-  },
+  robots: { index: false, follow: false },
+  icons: { icon: [{ url: '/icons/wajjtv.svg', type: 'image/svg+xml' }], apple: [{ url: '/icons/wajjtv-192.png', sizes: '192x192' }] },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#0b101a',
+  themeColor: '#101111',
   width: 'device-width',
   initialScale: 1,
 };

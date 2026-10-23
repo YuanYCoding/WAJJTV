@@ -25,7 +25,7 @@ export interface AggregatedGroup {
 
 function buildGroup(name: string, year: string | undefined, items: SearchResultItem[]): AggregatedGroup {
   return {
-    key: `${name}|${year ?? ''}|${items.map((i) => `${i.sourceKey}_${i.vodId}`).join(',')}`,
+    key: `${name}|${year ?? ''}`,
     name,
     year,
     typeName: items.find((i) => i.typeName)?.typeName,
@@ -88,6 +88,7 @@ export function AggregatedCard({
   const showImg = !!group.pic && !imgFailed;
 
   const multi = group.items.length > 1;
+  const itemSignature = group.items.map((i) => `${i.sourceKey}_${i.vodId}`).join(',');
   const adult = useMemo(() => group.items.some((i) => i.isAdult), [group.items]);
 
   const { qualities, probing, progress, prime, probe, probeQueued, retry } = useQualityProbe(sources);
@@ -98,7 +99,7 @@ export function AggregatedCard({
   useEffect(() => {
     prime(group.items);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [group.key]);
+  }, [group.key, itemSignature]);
 
   // 单源卡片没有「展开」这一步：进入视口 500ms 后交给全局队列（并发 2），
   // 首屏能先亮，又不会把一屏十几张卡同时打向源站

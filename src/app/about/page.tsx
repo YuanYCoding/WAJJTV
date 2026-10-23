@@ -9,10 +9,10 @@ export default function AboutPage() {
       <Header />
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-10 space-y-8">
         <section>
-          <h1 className="text-xl font-bold text-content mb-3">关于 LibreTV</h1>
+          <h1 className="text-xl font-bold text-content mb-3">关于 WAJJTV</h1>
           <p className="text-sm text-muted leading-relaxed">
-            LibreTV 是一个免费的在线视频搜索与观看平台。输入片名即可在多个点播源中聚合搜索，
-            无需注册、无内嵌广告、不存储任何视频文件。所有播放内容均来自第三方公开接口。
+            WAJJTV 是海清和静静的私人放映室。一起选片、一起追剧，也把平凡的夜晚过成喜欢的样子。
+            基于 LibreTV 二次开发，保留 AGPL-3.0 许可证。片单与视频来自第三方接口。
           </p>
         </section>
 
@@ -31,8 +31,8 @@ export default function AboutPage() {
         <section>
           <h2 className="text-base font-semibold text-content mb-2.5">隐私与数据</h2>
           <p className="text-sm text-muted leading-relaxed">
-            你的搜索历史、观看进度等数据仅保存在本设备浏览器中（IndexedDB），不会上传到服务器。
-            聚合搜索请求由服务端代理转发，第三方数据源不会看到你的 IP 地址。
+            搜索历史和播放进度保存在当前设备的浏览器中；双人片单、选片偏好和当天候选保存在服务器，用于海清和静静之间及多设备同步。
+            聚合搜索由服务器转发；封面与视频直连时，上游服务可能接收到你的网络地址。双人插画受登录保护，未包含在公开源码中。
           </p>
         </section>
 

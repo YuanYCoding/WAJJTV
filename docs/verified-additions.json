@@ -1,0 +1,21 @@
+{
+  "name": "WAJJTV 新增实测来源",
+  "version": 2,
+  "sources": [
+    {
+      "name": "无尽影视",
+      "url": "https://api.wujinapi.com/api.php/provide/vod",
+      "isAdult": false
+    },
+    {
+      "name": "猫眼资源",
+      "url": "https://api.maoyanapi.top/api.php/provide/vod",
+      "isAdult": false
+    },
+    {
+      "name": "飘零资源",
+      "url": "https://p2100.net/api.php/provide/vod",
+      "isAdult": false
+    }
+  ]
+}
