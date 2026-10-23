@@ -317,7 +317,7 @@ export function PlayerShell({
     setShowPoster(true);
     const art = artRef.current;
     if (!art) return;
-    setupHls(art.video, targetUrl, true);
+    setupHls(art.video, targetUrl, /^https?:\/\//.test(targetUrl));
   };
 
   // —— 创建播放器（仅一次，挂载即创建） ——
@@ -388,7 +388,7 @@ export function PlayerShell({
       ],
       customType: {
         m3u8: (video: HTMLVideoElement, mediaUrl: string) => {
-          setupHls(video, mediaUrl, true);
+          setupHls(video, mediaUrl, /^https?:\/\//.test(mediaUrl));
         },
       },
     });

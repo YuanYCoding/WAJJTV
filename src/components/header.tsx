@@ -41,7 +41,7 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
         <div className="cinema-shell mx-auto h-16 flex items-center gap-3">
           <Link href="/" aria-label="WAJJTV 首页" className="wajjtv-brand shrink-0"><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden><path d="M5 3.5C5 2.7 5.9 2.2 6.6 2.6l15 8.5a1 1 0 0 1 0 1.8l-15 8.5A1.1 1.1 0 0 1 5 20.5Z" fill="currentColor" /></svg><span>WAJJTV</span></Link>
-          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' || pathname === '/collection' ? 'active' : ''}>发现</Link><Link href="/watchlist" className={pathname === '/watchlist' ? 'active' : ''}>我们的片单</Link><Link href="/tonight" className={pathname === '/tonight' ? 'active' : ''}>今晚看什么</Link></nav>}
+          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' || pathname === '/collection' ? 'active' : ''}>发现</Link><Link href="/watchlist" className={pathname === '/watchlist' ? 'active' : ''}>我们的片单</Link><Link href="/tonight" className={pathname === '/tonight' ? 'active' : ''}>今晚看什么</Link><Link href="/cloud" className={pathname === '/cloud' ? 'active' : ''}>网盘</Link></nav>}
 
           {showSearch && (
             <form
@@ -114,7 +114,7 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
           </nav>
         </div>
       </header>
-      {!['/watch', '/live'].includes(pathname) && <nav className="mobile-cinema-nav" aria-label="手机主导航"><Link href="/" aria-current={pathname === '/' || pathname === '/collection' ? 'page' : undefined}>发现</Link><Link href="/watchlist" aria-current={pathname === '/watchlist' ? 'page' : undefined}>我们的片单</Link><Link href="/tonight" aria-current={pathname === '/tonight' ? 'page' : undefined}>今晚看什么</Link></nav>}
+      {!['/watch', '/live'].includes(pathname) && <nav className="mobile-cinema-nav" aria-label="手机主导航"><Link href="/" aria-current={pathname === '/' || pathname === '/collection' ? 'page' : undefined}>发现</Link><Link href="/watchlist" aria-current={pathname === '/watchlist' ? 'page' : undefined}>我们的片单</Link><Link href="/tonight" aria-current={pathname === '/tonight' ? 'page' : undefined}>今晚看什么</Link><Link href="/cloud" aria-current={pathname === '/cloud' ? 'page' : undefined}>网盘</Link></nav>}
 
       <SourceManagerDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />

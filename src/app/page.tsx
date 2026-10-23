@@ -69,6 +69,10 @@ function HomeContent() {
     const seen = new Set<string>();
     return selectedKeys
       .map((key) => resolveSource({ customAPIs, envSources }, key))
+      .sort((a, b) => {
+        const x = sourceHealth[a?.key || '']; const y = sourceHealth[b?.key || ''];
+        return (x?.ok ? x.ms ?? 1e9 : 1e9) - (y?.ok ? y.ms ?? 1e9 : 1e9);
+      })
       .filter((s): s is NonNullable<typeof s> => {
         if (!s || !validateSourceUrl(s.url) || isSourceDisabled({ sourceHealth }, s.key) || isInDisabledSubscription({ subscriptions }, s.key) || seen.has(sourceIdentity(s.url))) return false;
         seen.add(sourceIdentity(s.url));
@@ -93,7 +97,8 @@ function HomeContent() {
   );
 
   const searchQuery = useQuery({
-    queryKey: ['search', urlQuery, selectedKeys, yellowFilter],
+    // 源配置异步加载后须换键；否则直接打开搜索链接会把“尚无配置”缓存成五分钟空结果。
+    queryKey: ['search', urlQuery, selectedKeys, yellowFilter, envSources, customAPIs],
     // 与 runSearch 的截断规则保持一致：顶栏搜索 / 手动构造长链接不会绕过上限
     queryFn: ({ signal }) => {
       setStreamedOutcomes([]);
@@ -102,7 +107,8 @@ function HomeContent() {
         signal,
         // 逐源结算即更新：结果边搜边渲染，同时滚动健康度
         onSource: (outcome) => {
-          setStreamedOutcomes((prev) => [...prev, outcome]);
+          setStreamedOutcomes((prev) => [...prev.filter((item) => item.sourceKey !== outcome.sourceKey), outcome]);
+          if (outcome.partial || outcome.cached) return;
           for (const ev of useAppStore.getState().recordSourceHealth([outcome])) {
             toast(
               ev.permanent
@@ -114,7 +120,7 @@ function HomeContent() {
         },
       });
     },
-    enabled: Boolean(urlQuery) && selectedKeys.length > 0,
+    enabled: Boolean(urlQuery) && selectedSources.length > 0,
     retry: false,
     // 5 分钟内从播放页返回时直接使用缓存，不重新搜索（服务端另有 60s 结果缓存兜底）
     staleTime: 300_000,
@@ -282,7 +288,7 @@ function HomeContent() {
                 “<span className="text-content">{urlQuery}</span>” 的搜索结果
                 {isSearching ? (
                   <span className="text-faint">
-                    （已就绪 {streamedOutcomes.length}/{selectedSources.length} 个源…）
+                    （已完成 {streamedOutcomes.filter((o) => !o.partial).length}/{selectedSources.length} 个源，先到先看…）
                   </span>
                 ) : (
                   searchQuery.data && (

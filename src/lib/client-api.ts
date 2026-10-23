@@ -337,16 +337,26 @@ async function searchStream(
     throwForAuthStatus(res);
     if (!res.ok || !res.body) throw new ApiError(`请求失败 (${res.status})`, res.status);
 
-    // done 事件缺失（流被截断）时退化为空结果，不让整次搜索报错
-    let final: SearchResponse = { list: [], failures: [] };
-    await consumeNdjson<SearchStreamEvent>(res, (event) => {
+    let final: SearchResponse | undefined;
+    const received = new Map<string, SourceSearchOutcome>();
+    try { await consumeNdjson<SearchStreamEvent>(res, (event) => {
       if (event.type === 'source') {
+        received.set(event.sourceKey, event);
         onSource(event);
       } else if (event.type === 'done') {
         final = { list: event.list, failures: event.failures };
       }
-    });
-    return final;
+    }); } catch (err) {
+      if (signal?.aborted || !received.size) throw err;
+      // Keep already delivered results when a network interruption closes the stream.
+    }
+    if (final) return final;
+    // 流中途结束不能把已经显示的影片清空，也不能误报“没有找到”。
+    if (!received.size) throw new ApiError('搜索连接中断，请重试', 0);
+    return {
+      list: [...received.values()].flatMap((outcome) => outcome.list),
+      failures: [{ sourceKey: '', error: '搜索连接中断，已保留收到的结果，请重试补全' }],
+    };
   }
 
 export type { SearchResponse, SearchResultItem };

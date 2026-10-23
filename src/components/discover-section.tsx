@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from './auth';
 import { SmartImage } from './smart-image';
 import { useAppStore } from '@/lib/store';
@@ -54,7 +53,7 @@ export function DiscoverSection() {
   const currentYear = new Date().getFullYear();
   return <section id="discover" className="discovery" aria-label="发现影视">
     <div className="discovery-heading"><div><h2>{tab === 'rank' ? '大家都在看' : '发现好故事'}</h2><p>{tab === 'rank' ? '跟着榜单，遇见下一部好剧。' : '总有一部，值得一起看。'}</p></div><span className="hidden sm:block text-xs text-faint">{tab === 'rank' ? '真实榜单 · 定时更新' : '电影与剧集 · 慢慢挑，慢慢看'}</span></div>
-    <div className="discovery-tabs"><div className="discovery-tab-buttons" role="tablist" aria-label="影视分类">{TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={cn(tab === t.id && 'active')} onClick={() => changeTab(t.id)}>{t.label}</button>)}</div><Link href="/collection">三级／伦理 ↗</Link></div>
+    <div className="discovery-tabs"><div className="discovery-tab-buttons" role="tablist" aria-label="影视分类">{TABS.map((t) => <button key={t.id} role="tab" aria-selected={tab === t.id} className={cn(tab === t.id && 'active')} onClick={() => changeTab(t.id)}>{t.label}</button>)}</div></div>
     {tab === 'rank' ? <div className="discovery-filters">{RANKS.map((r) => <button key={r.id} className={cn('filter-chip', rank === r.id && 'active')} aria-pressed={rank === r.id} onClick={() => setRank(r.id)}>{r.label}</button>)}</div> : <>
       {tab === 'anime' && <div className="flex gap-2 my-3"><button className={cn('filter-chip', !calendar && 'active')} onClick={() => setCalendar(false)}>动漫片库</button><button className={cn('filter-chip', calendar && 'active')} onClick={() => setCalendar(true)}>本周新番 · Bangumi</button></div>}
       {!calendar && <div className="discovery-filters">

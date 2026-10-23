@@ -17,6 +17,7 @@ const PlayerShell = dynamic(() => import('@/components/player-shell').then((m) =
 });
 import { EmptyState, LoadingState, Spinner } from '@/components/states';
 import { SwitchSourceModal } from '@/components/switch-source';
+import { ViewingControls } from '@/components/viewing-controls';
 import { enqueueDownload } from '@/components/download-manager';
 import { Icon } from '@/components/icon';
 import { useAuth } from '@/components/auth';
@@ -59,6 +60,8 @@ function WatchContent() {
 
   const [reversed, setReversed] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [theater, setTheater] = useState(false);
+  const playerBoxRef = useRef<HTMLDivElement>(null);
 
   const source = resolveSource(store, sourceKey, {
     url: searchParams.get('sourceUrl') || undefined,
@@ -232,10 +235,10 @@ function WatchContent() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+      <main className={cn('flex-1 w-full mx-auto px-4 py-4', theater ? 'max-w-[1600px]' : 'max-w-7xl')}>
+        <div className={cn('grid grid-cols-1 gap-4', !theater && 'lg:grid-cols-[1fr_300px]')}>
           <div>
-            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+            <div ref={playerBoxRef} className="aspect-video bg-black rounded-lg overflow-hidden">
               {currentUrl ? (
                 <PlayerShell
                   url={currentUrl}
@@ -275,6 +278,7 @@ function WatchContent() {
             </div>
 
             {/* 操作栏 */}
+            <ViewingControls playerRef={playerBoxRef} theater={theater} onTheater={() => setTheater((value) => !value)} />
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <button
                 className="btn-ghost btn-sm"

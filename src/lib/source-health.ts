@@ -26,10 +26,13 @@ export function sourceIdentity(raw: string): string {
       ['modu', /(^|\.)(mdzyapi\.com|moduapi\.cc)$/],
       ['hongniu', /(^|\.)hongniuzy[23]\.com$/],
       ['jinying', /(^|\.)(jyzyapi\.com|jinyingzy\.com)$/],
-      ['ffzy', /(^|\.)ffzyapi\.com$/],
+      ['ffzy', /(^|\.)(ffzyapi\.com|ffzyapi8\.com|ffzy\.tv|ffzy5\.tv)$/],
       ['lzi', /(^|\.)lziapi\.com$/],
       ['360zy', /(^|\.)(360zy\.com|360zyzz\.com)$/],
       ['zuid', /(^|\.)(zuidapi\.com|zuidazy\.me)$/],
+      ['huya', /(^|\.)huyaapi\.com$/],
+      ['subo', /(^|\.)(subocaiji\.com|subocj\.com)$/],
+      ['maoyan', /(^|\.)(maoyanapi\.top|maoyanzy\.com)$/],
     ] as const;
     const family = families.find(([, pattern]) => pattern.test(u.hostname));
     return family?.[0] || `${u.host}${u.pathname.replace(/\/at\/json\/?$/, '').replace(/\/+$/, '')}${u.search}`;

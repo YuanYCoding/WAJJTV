@@ -62,6 +62,11 @@ export interface DoubanItem {
 }
 
 export interface SourceSearchOutcome {
+  /** 本源第一页已到达，后续分页仍在进行；不能重复计入健康度或完成数。 */
+  partial?: boolean;
+  /** 部分分页失败，已取得的结果仍然有效。 */
+  incomplete?: boolean;
+  cached?: boolean;
   skipped?: boolean;
   sourceKey: string;
   ok: boolean;

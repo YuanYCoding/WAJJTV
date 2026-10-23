@@ -26,22 +26,22 @@ function searchCacheKey(wd: string, sources: SourceConfig[], filterAdult: boolea
 /**
  * 每个源最多抓取的页数。
  * 第一页响应会带回 pagecount（源站真实总页数），实际抓取页数 = min(pagecount, 该值)。
- * 默认 5；页与页之间并行请求，单页失败只丢弃该页。
+ * 默认 2；第一页立即推送，后续页并行请求，单页失败保留已有结果。
  */
 const SEARCH_MAX_PAGES = (() => {
   const n = parseInt(process.env.SEARCH_MAX_PAGES || '2', 10);
-  if (!Number.isFinite(n)) return 5;
+  if (!Number.isFinite(n)) return 2;
   return Math.min(50, Math.max(1, n));
 })();
 
 /**
  * 单源总死线（毫秒）：该源所有分页请求必须在时限内完成，到点中断在途请求并标记超时。
  * 没有它时慢源最坏要等「首页 8s + 后续页并行 8s」，拖垮整体响应。
- * 环境变量 SEARCH_SOURCE_TIMEOUT_MS 可配，默认 10s。
+ * 环境变量 SEARCH_SOURCE_TIMEOUT_MS 可配，默认 6s。
  */
 const SEARCH_SOURCE_TIMEOUT_MS = (() => {
   const n = parseInt(process.env.SEARCH_SOURCE_TIMEOUT_MS || '6000', 10);
-  if (!Number.isFinite(n)) return 10000;
+  if (!Number.isFinite(n)) return 6000;
   return Math.min(60000, Math.max(3000, n));
 })();
 
@@ -57,10 +57,14 @@ function isTimeoutError(err: unknown): boolean {
  * 整源受 SEARCH_SOURCE_TIMEOUT_MS 总死线约束。
  * 旧版在浏览器里打满 N 个请求（暴露用户 IP、无法缓存、超时失控），现全部上移。
  */
-async function searchSource(source: SourceConfig, wd: string, signal?: AbortSignal): Promise<SourceSearchOutcome> {
+async function searchSource(source: SourceConfig, wd: string, signal?: AbortSignal, onPartial?: (outcome: SourceSearchOutcome) => void): Promise<SourceSearchOutcome> {
   const known = readSourceHealth(source.url);
   if (known?.status === 'unavailable') return { sourceKey: source.key, ok: false, skipped: true, list: [], error: '暂时失效，等待后台复检' };
+  const sourceCacheKey = `source-search:${JSON.stringify([source.url, wd, SEARCH_MAX_PAGES])}`;
+  const cached = getCache<SourceSearchOutcome['list']>(sourceCacheKey);
+  if (cached) return { sourceKey: source.key, ok: true, cached: true, ms: 0, list: cached.map((item) => ({ ...item, sourceKey: source.key, sourceName: source.name })) };
   const start = Date.now();
+  let firstList: SourceSearchOutcome['list'] | undefined;
   const finish = (outcome: Omit<SourceSearchOutcome, 'ms'>): SourceSearchOutcome => ({
     ...outcome,
     ms: Date.now() - start,
@@ -81,10 +85,11 @@ async function searchSource(source: SourceConfig, wd: string, signal?: AbortSign
       resolve(
         finish({
           sourceKey: source.key,
-          ok: false,
-          list: [],
-          error: `请求超时（>${Math.round(SEARCH_SOURCE_TIMEOUT_MS / 1000)}s）`,
-          timedOut: true,
+          ok: firstList !== undefined,
+          list: firstList ?? [],
+          incomplete: firstList !== undefined,
+          error: firstList ? '部分分页超时，已保留先到的结果' : `请求超时（>${Math.round(SEARCH_SOURCE_TIMEOUT_MS / 1000)}s）`,
+          timedOut: firstList === undefined,
         })
       );
     }, SEARCH_SOURCE_TIMEOUT_MS);
@@ -94,7 +99,7 @@ async function searchSource(source: SourceConfig, wd: string, signal?: AbortSign
   const fetchPage = async (page: number) => {
     const api = cmsUrl(base, { ac: 'detail', wd, pg: String(page) });
     const res = await fetchUpstream(api, {
-      timeoutMs: 8000,
+      timeoutMs: page === 1 ? SEARCH_SOURCE_TIMEOUT_MS : 2000,
       headers: cmsRequestHeaders(),
       signal: controller.signal,
     });
@@ -107,22 +112,26 @@ async function searchSource(source: SourceConfig, wd: string, signal?: AbortSign
   const run = async (): Promise<SourceSearchOutcome> => {
     const first = await fetchPage(1);
     const list = parseSearchList(first, source);
+    firstList = list;
     // 源站真实总页数与配置上限取较小者；pagecount 缺失或非法时视为 1 页
     const rawPageCount = parseInt(String((first as { pagecount?: unknown }).pagecount ?? '1'), 10);
     const pageCount = Math.min(Number.isFinite(rawPageCount) ? Math.max(1, rawPageCount) : 1, SEARCH_MAX_PAGES);
+    let incomplete = false;
     if (pageCount > 1) {
+      if (!controller.signal.aborted) onPartial?.(finish({ sourceKey: source.key, ok: true, list: [...list], partial: true }));
       const extraPages = await Promise.all(
         Array.from({ length: pageCount - 1 }, (_, i) => i + 2).map(async (page) => {
           try {
             return parseSearchList(await fetchPage(page), source);
           } catch {
+            incomplete = true;
             return [];
           }
         })
       );
       list.push(...extraPages.flat());
     }
-    return { sourceKey: source.key, ok: true, list };
+    return { sourceKey: source.key, ok: true, list, ...(incomplete ? { incomplete: true } : {}) };
   };
 
   try {
@@ -140,6 +149,7 @@ async function searchSource(source: SourceConfig, wd: string, signal?: AbortSign
       );
     const result = await Promise.race([runPromise, deadline]);
     if (!signal?.aborted) recordSourceResult(source.url, result.ok, result.ms, result.error);
+    if (result.ok && !result.incomplete && !controller.signal.aborted) setCache(sourceCacheKey, result.list, 90_000);
     return result;
   } catch (err) {
     return finish({
@@ -212,9 +222,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: '请至少选择一个点播源' }, { status: 400 });
   }
   const seen = new Set<string>();
-  const rankedSources = body.sources.filter((s) => s && typeof s.url === 'string').sort((a, b) =>
-    Number(readSourceHealth(a.url)?.status === 'unavailable') - Number(readSourceHealth(b.url)?.status === 'unavailable')
-  );
+  const rankedSources = body.sources.filter((s) => s && typeof s.url === 'string').sort((a, b) => {
+    const x = readSourceHealth(a.url); const y = readSourceHealth(b.url);
+    return Number(x?.status === 'unavailable') - Number(y?.status === 'unavailable')
+      || (x?.status === 'healthy' ? x.ms ?? 1e9 : 1e9) - (y?.status === 'healthy' ? y.ms ?? 1e9 : 1e9);
+  });
   const sources = rankedSources.filter((s) => {
     if (!s || typeof s.key !== 'string' || typeof s.name !== 'string' || typeof s.url !== 'string') return false;
     if (body.filterAdult !== false && s.isAdult) return false;
@@ -227,7 +239,7 @@ export async function POST(req: Request) {
   const filterAdult = body.filterAdult !== false;
 
   const cacheKey = searchCacheKey(wd, sources, filterAdult);
-  const cached = getCache<SearchResponse>(cacheKey);
+  const cached = sources.some((s) => readSourceHealth(s.url)?.status === 'unavailable') ? undefined : getCache<SearchResponse>(cacheKey);
   if (cached) {
     // 流式模式下缓存命中也要走 done 事件，客户端解析逻辑保持单一
     if (new URL(req.url).searchParams.get('stream') === '1') {
@@ -243,7 +255,7 @@ export async function POST(req: Request) {
   if (!isStream) {
     const outcomes = await Promise.all(sources.map((source) => searchSource(source, wd, req.signal)));
     const payload = aggregateOutcomes(outcomes, wd, filterAdult);
-    setCache(cacheKey, payload, SEARCH_CACHE_TTL);
+    if (outcomes.every((o) => o.ok && !o.incomplete) && !req.signal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
     return NextResponse.json(payload);
   }
 
@@ -264,7 +276,10 @@ export async function POST(req: Request) {
       const outcomes: SourceSearchOutcome[] = new Array(sources.length);
       await Promise.all(
         sources.map(async (source, i) => {
-          const outcome = await searchSource(source, wd, req.signal);
+          const outcome = await searchSource(source, wd, req.signal, (partial) => {
+            const { list } = aggregateOutcomes([partial], wd, filterAdult);
+            send({ type: 'source', ...partial, list });
+          });
           outcomes[i] = outcome;
           // 中间结果与最终结果共用去重和过滤规则，避免无关/成人条目短暂出现在页面上。
           const { list } = aggregateOutcomes([outcome], wd, filterAdult);
@@ -273,7 +288,7 @@ export async function POST(req: Request) {
       );
 
       const payload = aggregateOutcomes(outcomes, wd, filterAdult);
-      setCache(cacheKey, payload, SEARCH_CACHE_TTL);
+      if (outcomes.every((o) => o.ok && !o.incomplete) && !req.signal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
       send({ type: 'done', list: payload.list, failures: payload.failures });
       closed = true;
       try {
