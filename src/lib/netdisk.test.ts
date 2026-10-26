@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseQuarkShare, mergeCookies, isRelevantPanTitle } from './netdisk-utils';
 import { extractQuarkLinks, parseSearchCards } from './netdisk-search';
-import { quarkVault, quarkStatus, startQuarkLogin, pollQuarkLogin, disconnectQuark, listQuarkShare, playQuarkFile, quarkMedia, issueQuarkMedia } from './quark-server';
+import { quarkVault, quarkStatus, startQuarkLogin, pollQuarkLogin, disconnectQuark, listQuarkShare, playQuarkFile, previewQuarkFile, quarkMedia, issueQuarkMedia } from './quark-server';
 import { GET, POST } from '@/app/api/netdisk/route';
 import { SESSION_COOKIE, signSession } from './auth';
 vi.mock('./ssrf', () => ({ checkUpstreamAllowed: vi.fn(async () => ({ ok: true })) }));
@@ -39,6 +39,69 @@ describe('netdisk input and source parsing', () => {
   });
 });
 describe('Quark account, share and streaming', () => {
+  it('refreshes an anonymous file token for the current account and retries one explicit 41020 rejection', async () => {
+    let listings = 0; let saves = 0; const submitted: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+      if (input.includes('sharepage/token')) return ok({ stoken: 'session-' + listings });
+      if (input.includes('sharepage/detail')) {
+        listings++; expect(new URL(input).searchParams.get('_page')).toBe('2');
+        return ok({ list: [{ fid: 'v1', file_name: 'video.mp4', file_type: 1, share_fid_token: listings === 1 ? 'anonymous-token' : 'fresh-' + listings }] });
+      }
+      if (input.includes('file/sort')) return ok({ list: [{ fid: 'folder1', file_name: 'JjBiTV 追剧', file_type: 0 }] });
+      if (input.includes('sharepage/save')) { const body = JSON.parse(String(init?.body)); submitted.push(body.fid_token_list[0]); saves++; return saves === 1 ? json({ code: 41020, message: 'file token expired' }) : ok({ task_id: 'task1' }); }
+      if (input.includes('/task?')) return ok({ save_as: { save_as_top_fids: ['saved1'] } });
+      if (input.includes('file/v2/play')) return ok({ video_list: [] });
+      if (input.includes('file/download')) return ok([{ download_url: 'https://cdn.quark.cn/video.mp4' }]);
+      throw new Error('unexpected endpoint');
+    }));
+    const listing = await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789', '', '', 2);
+    connect(); const result = await playQuarkFile(req(), listing.items[0].key);
+    expect(result.saved).toBe(true); expect(submitted).toEqual(['fresh-2', 'fresh-3']); expect(saves).toBe(2);
+    expect(quarkVault().read()?.tasks).toEqual({});
+  });
+  it('bounds token retries and does not leave a definitely rejected save marked uncertain', async () => {
+    connect(); let writes = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      if (input.includes('sharepage/token')) return ok({ stoken: 'token' });
+      if (input.includes('sharepage/detail')) return ok({ list: [{ fid: 'v1', file_name: 'v.mp4', file_type: 1, share_fid_token: 'fresh' }] });
+      if (input.includes('file/sort')) return ok({ list: [{ fid: 'folder1', file_name: 'JjBiTV 追剧', file_type: 0 }] });
+      if (input.includes('sharepage/save')) { writes++; return json({ code: 41020 }); }
+      throw new Error('unexpected endpoint');
+    }));
+    const listing = await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789');
+    await expect(playQuarkFile(req(), listing.items[0].key)).rejects.toMatchObject({ code: 'SHARE_TOKEN_EXPIRED', status: 409 });
+    expect(writes).toBe(2); expect(quarkVault().read()?.tasks).toEqual({});
+  });
+  it('labels preview duration from the actual HLS, never saves or promises the full API duration', async () => {
+    connect(); const routes: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      routes.push(input);
+      if (input.includes('sharepage/token')) return ok({ stoken: 'token' });
+      if (input.includes('sharepage/detail')) return ok({ list: [{ fid: 'v1', file_name: 'v.mp4', file_type: 1, share_fid_token: 'fresh' }] });
+      if (input.includes('video_preview')) { expect(new URL(input).searchParams.get('fid_token')).toBe('fresh'); return ok({ duration: 2554, accessable: true, play_info: { duration: 2554, url: 'https://cdn.quark.cn/preview.m3u8', format: 'm3u8', width: 1440, height: 810 } }); }
+      if (input.includes('preview.m3u8')) return new Response('#EXTM3U\n#EXTINF:60,\na.ts\n#EXTINF:61,\nb.ts\n#EXT-X-ENDLIST', { headers: { 'Content-Type': 'application/vnd.apple.mpegurl' } });
+      throw new Error('unexpected endpoint');
+    }));
+    const listing = await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789');
+    const before = readFileSync(join(directory, 'quark-credentials.enc'), 'utf8');
+    const result = await previewQuarkFile(req(), listing.items[0].key);
+    expect(result).toMatchObject({ saved: false, limited: true, duration: 121, sourceDuration: 2554 });
+    expect(result.qualities[0].label).toContain('试看'); expect(routes.some((u) => /sharepage\/save|file\/download|file\/sort/.test(u))).toBe(false);
+    expect(readFileSync(join(directory, 'quark-credentials.enc'), 'utf8')).toBe(before);
+  });
+  it('does not transfer automatically when the preview is unavailable', async () => {
+    connect(); let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      calls++;
+      if (input.includes('sharepage/token')) return ok({ stoken: 'token' });
+      if (input.includes('sharepage/detail')) return ok({ list: [{ fid: 'v1', file_name: 'v.mp4', file_type: 1, share_fid_token: 'fresh' }] });
+      if (input.includes('video_preview')) return ok({ accessable: false, play_info: { url: 'https://cdn.quark.cn/no.mp4' } });
+      throw new Error('unexpected write');
+    }));
+    const listing = await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789');
+    await expect(previewQuarkFile(req(), listing.items[0].key)).rejects.toMatchObject({ code: 'PREVIEW_UNAVAILABLE' });
+    expect(calls).toBe(5); expect(quarkVault().read()?.saved).toEqual({});
+  });
   it('keeps QR login bound to its initiating browser and stores encrypted cookies', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: string) => input.includes('getTokenFor') ? json({ status: 2000000, data: { members: { token: 'qr-token' } } })
       : input.includes('getServiceTicket') ? json({ status: 2000000, data: { members: { service_ticket: 'private-ticket' } } })

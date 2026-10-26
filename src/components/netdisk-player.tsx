@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PanQuality } from '@/lib/netdisk-types';
 import { ViewingControls } from './viewing-controls';
 
-export function NetdiskPlayer({ quality, title, identity, onNext, onRefresh }: { quality: PanQuality; title: string; identity: string; onNext?: () => void; onRefresh: () => void }) {
+export function NetdiskPlayer({ quality, title, identity, saved, limited, onNext, onRefresh }: { quality: PanQuality; title: string; identity: string; saved: boolean; limited?: boolean; onNext?: (automatic?: boolean) => void; onRefresh: () => void }) {
   const box = useRef<HTMLDivElement>(null); const video = useRef<HTMLVideoElement>(null);
   const [resolution, setResolution] = useState(''); const [error, setError] = useState('');
   const [theater, setTheater] = useState(false); const [autoNext, setAutoNext] = useState(false);
@@ -30,19 +30,19 @@ export function NetdiskPlayer({ quality, title, identity, onNext, onRefresh }: {
   useEffect(() => { setError(''); setResolution(''); }, [quality.url]);
   useEffect(() => () => save(), [identity]); // eslint-disable-line react-hooks/exhaustive-deps
   return <section className={theater ? 'fixed inset-0 z-50 bg-black p-3 sm:p-6 flex flex-col justify-center' : 'mt-6'}>
-    <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-medium truncate">{title}</h2><span className="text-xs text-accent shrink-0">{resolution || '原文件 · 等待解码'}</span></div>
+    <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-medium truncate">{title}</h2><span className="text-xs text-accent shrink-0">{resolution || '正在读取实际画质'}</span></div>
     <div ref={box} className="aspect-video max-h-[78vh] bg-black rounded-lg overflow-hidden">
       <video ref={video} controls autoPlay playsInline preload="metadata" className="w-full h-full" onLoadedMetadata={() => {
         const el = video.current!; if (el.videoWidth) setResolution(`实测 ${el.videoWidth} × ${el.videoHeight}`);
         try { const p = Number(localStorage.getItem('jjbitv:pan-progress:' + identity)); if (p > 0 && p < el.duration - 5) el.currentTime = p; } catch { /* unavailable storage */ }
       }} onResize={() => { const el = video.current!; if (el.videoWidth) setResolution(`实测 ${el.videoWidth} × ${el.videoHeight}`); }} onPause={save} onTimeUpdate={() => { if (video.current && Math.floor(video.current.currentTime) % 10 === 0) save(); }} onError={() => setError('当前浏览器无法播放此文件，可能是编码、网盘限速或播放地址失效。可以刷新地址，或用夸克 App 播放。')} onEnded={() => {
         try { localStorage.removeItem('jjbitv:pan-progress:' + identity); } catch { /* optional */ }
-        if (autoNext) onNext?.();
+        if (autoNext) onNext?.(true);
       }} />
     </div>
-    <div className="flex flex-wrap items-center gap-2 mt-3"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={onNext}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />自动连播</label></>}</div>
+    <div className="flex flex-wrap items-center gap-2 mt-3"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />自动连播（逐集转存，占用空间）</label></>}</div>
     <ViewingControls playerRef={box} theater={theater} onTheater={() => setTheater((v) => !v)} />
     {error && <p role="alert" className="text-warning text-sm mt-3">{error}</p>}
-    <p className="text-xs text-faint mt-3">首次播放已转存至你的「JjBiTV 追剧」目录。保留原文件画质，实际速度取决于账号与网络；本站不会自动删除网盘文件。</p>
+    <p className="text-xs text-faint mt-3">{saved ? '已转存到「JjBiTV 追剧」，占用网盘空间；本站不会自动删除文件。' : limited ? '当前为免转存试看，不占用网盘空间。试看结束不会自动转存；完整观看可在夸克中查看或自行选择转存。' : '当前没有转存，不占用网盘空间。可播放时长以夸克实际提供为准。'}</p>
   </section>;
 }

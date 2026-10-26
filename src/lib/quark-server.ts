@@ -3,11 +3,11 @@ import QRCode from 'qrcode';
 import { CloudVault } from './cloud-vault';
 import { PanError, idValue, mergeCookies, parseQuarkShare, plainText } from './netdisk-utils';
 import { checkUpstreamAllowed } from './ssrf';
-import type { PanFile, PanListing, PanQuality } from './netdisk-types';
+import type { PanFile, PanListing, PanQuality, PanPlayback } from './netdisk-types';
 
 interface QuarkAccount { id: string; cookie: string; name: string; folder?: string; saved: Record<string, string>; tasks?: Record<string, string> }
 interface Login { token: string; owner: string; expires: number; polling?: Promise<{ connected: boolean; expired?: boolean }> }
-interface FileRef { fid: string; token: string; name: string; folder: boolean; size: number; share: ReturnType<typeof parseQuarkShare>; parent: string; owner: string; expires: number; width?: number; height?: number }
+interface FileRef { fid: string; token: string; name: string; folder: boolean; size: number; share: ReturnType<typeof parseQuarkShare>; parent: string; page: number; owner: string; expires: number; width?: number; height?: number }
 interface Media { url: string; account: string; expires: number; kind: 'hls' | 'video' }
 interface Registry { logins: Map<string, Login>; files: Map<string, FileRef>; media: Map<string, Media>; playback: Map<string, Promise<{ qualities: PanQuality[]; saved: boolean }>> }
 const root = globalThis as typeof globalThis & { __jjbiQuark?: Registry };
@@ -40,7 +40,9 @@ function requireSuccess(data: Record<string, unknown>, status: number) {
   if (status < 400 && (code === 0 || code === 200)) return;
   if (status === 401 || /未登录|请先?登录|登录失效|登录状态/.test(String(data.message))) throw new PanError('夸克登录已失效，请重新扫码', 409, 'LOGIN_REQUIRED');
   if ([41031, 41012].includes(code) || /取消了分享|分享者.*封禁/.test(String(data.message))) throw new PanError('该分享已失效或被夸克限制，请换一个资源', 410, 'SHARE_UNAVAILABLE');
-  if ([41008, 41009].includes(code)) throw new PanError('分享访问凭证或提取码已失效，请重新打开分享', 409, 'SHARE_TOKEN_EXPIRED');
+  // Quark's own share client defines 41020 as FID_TOKEN_EXPIRED and 41016 as STOKEN_EXPIRED.
+  if ([41016, 41020].includes(code)) throw new PanError('分享文件的访问凭证已过期，请重新打开目录后播放', 409, 'SHARE_TOKEN_EXPIRED');
+  if ([41007, 41008].includes(code)) throw new PanError('分享需要正确的提取码', 409, 'PASSCODE_REQUIRED');
   if (/提取码|密码/.test(String(data.message))) throw new PanError('分享需要正确的提取码', 409, 'PASSCODE_REQUIRED');
   if (/空间|容量/.test(String(data.message))) throw new PanError('夸克网盘空间不足，请先整理空间', 409, 'CAPACITY');
   if (/会员|权益|权限/.test(String(data.message))) throw new PanError('当前账号暂不支持这条播放线路，可尝试其他画质或在夸克中打开', 403, 'ACCOUNT_LIMIT');
@@ -60,7 +62,8 @@ async function drive(path: string, value?: QuarkAccount, body?: object, query: R
     current.cookie = mergeCookies(current.cookie, result.setCookies);
     quarkVault().write(current, current.id); value.cookie = current.cookie;
   }
-  requireSuccess(result.data, result.status);
+  try { requireSuccess(result.data, result.status); }
+  catch (e) { console.warn('[quark] request rejected', { phase: path, status: result.status, code: Number(result.data.code) || 0 }); throw e; }
   const data = result.data.data;
   return (Array.isArray(data) ? data : { ...(data as Record<string, unknown>), __metadata: result.data.metadata }) as Record<string, unknown> | Record<string, unknown>[];
 }
@@ -133,7 +136,7 @@ export async function listQuarkShare(req: Request, raw: string, passcode = '', p
     const name = plainText(file.file_name, 300);
     if (!folder && !/\.(mp4|mkv|ts|mov|avi|m4v|webm)$/i.test(name)) continue;
     const key = randomUUID(); const video = file.video_info as Record<string, unknown> | undefined;
-    const ref: FileRef = { fid: idValue(file.fid), token: String(file.share_fid_token || ''), name, folder, size: Number(file.size) || 0, share, parent, owner: owner(req), expires: Date.now() + 8 * 60 * 60_000, width: Number(video?.width) || undefined, height: Number(video?.height) || undefined };
+    const ref: FileRef = { fid: idValue(file.fid), token: String(file.share_fid_token || ''), name, folder, size: Number(file.size) || 0, share, parent, page, owner: owner(req), expires: Date.now() + 8 * 60 * 60_000, width: Number(video?.width) || undefined, height: Number(video?.height) || undefined };
     const identity = createHash('sha256').update(share.id + ':' + ref.fid).digest('hex').slice(0, 32);
     registry.files.set(key, ref); items.push({ key, identity, name, folder, size: ref.size, width: ref.width, height: ref.height });
   }
@@ -146,6 +149,61 @@ function persist(value: QuarkAccount) {
   if (!current || current.id !== value.id) throw new PanError('夸克连接已更改，请刷新后重试', 409);
   value.cookie = current.cookie;
   if (!quarkVault().write(value, value.id)) throw new PanError('夸克连接已更改，请刷新后重试', 409);
+}
+async function freshShareFile(value: QuarkAccount, ref: FileRef) {
+  // A file token from anonymous browsing (or a previous login) cannot be used for this account's save.
+  // Refresh stoken and share_fid_token together, using the same account and original directory/page.
+  const stoken = await shareToken(ref.share, value);
+  const data = await drive('share/sharepage/detail', value, undefined, { pwd_id: ref.share.id, stoken, pdir_fid: ref.parent, _page: String(ref.page), _size: '100', _fetch_total: '1', _sort: 'file_type:asc,file_name:asc' }) as { list?: Record<string, unknown>[] };
+  const file = data.list?.find((f) => f.fid === ref.fid);
+  if (!file || file.file_type === 0 || file.dir === true) throw new PanError('这集在分享目录中已变动，请重新打开目录选择', 409, 'FILE_CHANGED');
+  if (typeof file.share_fid_token !== 'string' || !file.share_fid_token) throw new PanError('夸克未提供这集的转存凭证，请重新打开目录或在夸克中查看', 409, 'SHARE_TOKEN_EXPIRED');
+  return { stoken, token: file.share_fid_token };
+}
+function fileReference(req: Request, key: string) {
+  const ref = registry.files.get(key);
+  if (!ref || ref.owner !== owner(req) || ref.expires < Date.now() || ref.folder) throw new PanError('文件列表已过期，请重新打开分享', 409);
+  return ref;
+}
+export async function previewQuarkFile(req: Request, key: string): Promise<PanPlayback> {
+  const ref = fileReference(req, key); const value = account();
+  const fresh = await freshShareFile(value, ref);
+  const data = await drive('share/sharepage/video_preview', value, undefined, { pwd_id: ref.share.id, stoken: fresh.stoken, fid: ref.fid, fid_token: fresh.token, format: 'png' }) as Record<string, unknown>;
+  const info = data.play_info as Record<string, unknown> | undefined;
+  if (data.accessable === false || !info || typeof info.url !== 'string' || !info.url.startsWith('https://')) throw new PanError('夸克暂未提供这集的免转存播放线路。可以在夸克中查看，或自行选择「转存后播放」', 409, 'PREVIEW_UNAVAILABLE');
+  const current = account();
+  if (current.id !== value.id) throw new PanError('夸克连接已更改，请刷新后重试', 409);
+  const width = Number(info.width) || undefined; const height = Number(info.height) || undefined;
+  const kind = /m3u8/i.test(String(info.format)) || /\.m3u8(?:[?#]|$)/i.test(info.url) ? 'hls' : 'video';
+  const sourceDuration = Number(data.duration) || undefined;
+  const url = issueQuarkMedia(info.url, value.id, kind);
+  // The preview API can report the full source duration while its actual HLS contains only two minutes.
+  // Never use play_info.duration to promise full playback or automatically transfer after the preview.
+  let duration: number | undefined;
+  if (kind === 'hls') {
+    const manifest = await quarkMedia(new Request(req.url, { signal: req.signal }), new URL(url, req.url).searchParams.get('id')!);
+    const text = await manifest.text();
+    const parts = [...text.matchAll(/^#EXTINF:([\d.]+)/gm)].map((m) => Number(m[1]));
+    if (text.includes('#EXT-X-ENDLIST') && parts.length) duration = Math.round(parts.reduce((sum, n) => sum + n, 0));
+  }
+  return { qualities: [{ label: `免转存试看${height ? ` · ${height}P` : ''}`, kind, width, height, url }], saved: false, duration, sourceDuration, limited: true };
+}
+async function saveShareFile(value: QuarkAccount, ref: FileRef, mapping: string) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const fresh = await freshShareFile(value, ref);
+    value.tasks![mapping] = 'uncertain'; persist(value);
+    try {
+      const saved = await drive('share/sharepage/save', value, { fid_list: [ref.fid], fid_token_list: [fresh.token], to_pdir_fid: value.folder, pwd_id: ref.share.id, stoken: fresh.stoken, pdir_fid: ref.parent, scene: 'link' }) as Record<string, unknown>;
+      if (typeof saved.task_id !== 'string' || !/^[A-Za-z\d_-]{1,128}$/.test(saved.task_id)) throw new PanError('夸克已接收转存，但未返回任务编号，请先在夸克确认结果', 502, 'TRANSFER_UNCERTAIN');
+      const task = idValue(saved.task_id); value.tasks![mapping] = task; persist(value); return task;
+    } catch (e) {
+      // Only an explicit provider rejection permits another write. Timeouts remain uncertain.
+      if (e instanceof PanError && e.status < 500) { delete value.tasks![mapping]; persist(value); }
+      if (e instanceof PanError && e.code === 'SHARE_TOKEN_EXPIRED' && attempt === 0) continue;
+      throw e;
+    }
+  }
+  throw new PanError('分享凭证仍未刷新，请重新打开目录', 409, 'SHARE_TOKEN_EXPIRED');
 }
 async function playback(value: QuarkAccount, ref: FileRef) {
   const mapping = ref.share.id + ':' + ref.fid;
@@ -164,18 +222,7 @@ async function playback(value: QuarkAccount, ref: FileRef) {
     value.tasks ??= {};
     let task = value.tasks[mapping];
     if (task === 'uncertain') throw new PanError('上次转存结果暂未确认，请先在夸克查看「JjBiTV 追剧」目录，避免重复占用空间', 409, 'TRANSFER_UNCERTAIN');
-    if (!task) {
-      const stoken = await shareToken(ref.share, value);
-      value.tasks[mapping] = 'uncertain'; persist(value);
-      try {
-        const saved = await drive('share/sharepage/save', value, { fid_list: [ref.fid], fid_token_list: [ref.token], to_pdir_fid: value.folder, pwd_id: ref.share.id, stoken, pdir_fid: ref.parent, scene: 'link' }) as Record<string, unknown>;
-        task = idValue(saved.task_id); value.tasks[mapping] = task; persist(value);
-      } catch (e) {
-        // A timeout can occur after the provider saved the file. Do not blindly repeat that write.
-        if (e instanceof PanError && e.status < 500) { delete value.tasks[mapping]; persist(value); }
-        throw e;
-      }
-    }
+    if (!task) task = await saveShareFile(value, ref, mapping);
     for (let i = 0; i < 8; i++) {
       const result = await drive('task', value, undefined, { task_id: task, retry_index: String(i) }) as Record<string, unknown>;
       const saveAs = result.save_as as { save_as_top_fids?: string[] } | undefined;
@@ -198,7 +245,8 @@ async function playback(value: QuarkAccount, ref: FileRef) {
       const url = info?.url || row.url;
       if (typeof url !== 'string' || !url.startsWith('https://')) continue;
       const kind = /\.m3u8(?:[?#]|$)/i.test(url) || /m3u8/i.test(String(info?.format || row.format)) ? 'hls' : 'video';
-      try { qualities.push({ label: labels[String(row.resolution)] || '平台转码', url: issueQuarkMedia(url, value.id, kind), kind, width: Number(info?.width) || undefined, height: Number(info?.height) || undefined }); } catch { /* Unrecognized upstream host is not exposed. */ }
+      const height = Number(info?.height) || undefined;
+      try { qualities.push({ label: `${labels[String(row.resolution)] || '平台转码'}${height ? ` · ${height}P` : ''}`, url: issueQuarkMedia(url, value.id, kind), kind, width: Number(info?.width) || undefined, height }); } catch { /* Unrecognized upstream host is not exposed. */ }
     }
     qualities.sort((a, b) => (b.height || 0) - (a.height || 0));
   }
@@ -210,8 +258,7 @@ async function playback(value: QuarkAccount, ref: FileRef) {
   return { qualities, saved: true };
 }
 export async function playQuarkFile(req: Request, key: string) {
-  const ref = registry.files.get(key);
-  if (!ref || ref.owner !== owner(req) || ref.expires < Date.now() || ref.folder) throw new PanError('文件列表已过期，请重新打开分享', 409);
+  const ref = fileReference(req, key);
   const value = account(); const lock = value.id;
   // Serialize cloud mutations across tabs so folder creation and save mappings cannot overwrite each other.
   const previous = registry.playback.get(lock);

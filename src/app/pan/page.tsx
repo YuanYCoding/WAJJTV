@@ -6,7 +6,7 @@ import { SiteFooter } from '@/components/site-footer';
 import { useAuth } from '@/components/auth';
 import { NetdiskPlayer } from '@/components/netdisk-player';
 import { useFocusTrap } from '@/components/use-focus-trap';
-import type { PanFile, PanListing, PanQuality, PanResult, PanSearchEvent, PanStatus } from '@/lib/netdisk-types';
+import type { PanFile, PanListing, PanQuality, PanPlayback, PanResult, PanSearchEvent, PanStatus } from '@/lib/netdisk-types';
 import { parseQuarkShare } from '@/lib/netdisk-utils';
 
 class RequestError extends Error { constructor(message: string, public code?: string) { super(message); } }
@@ -27,7 +27,7 @@ function Content() {
   const [link, setLink] = useState(''); const [passcode, setPasscode] = useState('');
   const [active, setActive] = useState<{ title: string; url: string; passcode: string } | null>(null);
   const [folders, setFolders] = useState<{ key: string; name: string }[]>([]); const [listing, setListing] = useState<PanListing | null>(null);
-  const [playing, setPlaying] = useState<{ file: PanFile; quality: PanQuality; qualities: PanQuality[] } | null>(null);
+  const [playing, setPlaying] = useState<(PanPlayback & { file: PanFile; quality: PanQuality }) | null>(null);
   const [qr, setQr] = useState<{ id: string; expires: number; qr: string } | null>(null);
   const [qrError, setQrError] = useState(''); const [qrLoading, setQrLoading] = useState(false);
   const [qrOpen, setQrOpen] = useState(false); const qrRun = useRef(0);
@@ -95,10 +95,11 @@ function Content() {
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(''); }
   };
-  const play = async (file: PanFile) => {
+  const play = async (file: PanFile, save = false, refreshing = false) => {
     if (!status?.connected) { void login(); return; }
+    if (save && !refreshing && !window.confirm(`将「${file.name}」这一集转存到「JjBiTV 追剧」后播放？\n约 ${(file.size / 1024 ** 3).toFixed(2)} GB，会占用网盘空间；不会转存整个资源目录，已转存的这一集会复用。`)) return;
     setBusy(file.key); setError('');
-    try { const value = await call<{ qualities: PanQuality[] }>({ action: 'play', key: file.key, saveConsent: true }); setPlaying({ file, quality: value.qualities[0], qualities: value.qualities }); }
+    try { const value = await call<PanPlayback>({ action: save ? 'play' : 'preview', key: file.key, ...(save ? { saveConsent: true } : {}) }); setPlaying({ ...value, file, quality: value.qualities[0] }); }
     catch (e) { setError((e as Error).message); if ((e as RequestError).code === 'LOGIN_REQUIRED') { void refreshStatus(); void login(); } }
     finally { setBusy(''); }
   };
@@ -116,12 +117,12 @@ function Content() {
       {error && <p role="alert" className="p-3 mb-5 text-sm text-warning bg-chip rounded-lg">{error}</p>}
       {qrError && !qr && <p role="alert" className="text-warning text-sm mb-4">{qrError}</p>}
       {active && listing && <section className="border border-line bg-surface-raised rounded-xl p-4 sm:p-5 mb-7">
-        <div className="flex items-start justify-between gap-2 mb-3"><div><h2 className="font-medium break-all">{active.title}</h2><p className="text-xs text-faint mt-2">首次播放会转存到「JjBiTV 追剧」目录，占用你的网盘空间；已转存的集数会复用。</p></div><button className="btn-ghost btn-sm shrink-0" onClick={() => { setActive(null); setListing(null); }}>收起目录</button></div>
+        <div className="flex items-start justify-between gap-2 mb-3"><div><h2 className="font-medium break-all">{active.title}</h2><p className="text-xs text-faint mt-2 leading-5">「免转存试看」不占空间，时长由夸克限制；「转存后播放」只保存你选中的一集，已转存的会复用，不会保存整个资源目录。</p></div><button className="btn-ghost btn-sm shrink-0" onClick={() => { setActive(null); setListing(null); setPlaying(null); }}>收起目录</button></div>
         <nav aria-label="分享目录路径" className="flex flex-wrap gap-1 mb-3"><button className="btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => void openShare(active)}>根目录</button>{folders.map((f, i) => <button className="btn-ghost btn-sm max-w-full truncate" key={f.key} disabled={Boolean(busy)} onClick={() => void openShare(active, folders.slice(0, i + 1))}>/ {f.name}</button>)}</nav>
-        <div className="grid gap-2 sm:grid-cols-2">{listing.items.map((file) => <button key={file.key} className="text-left min-w-0 rounded-lg border border-line p-3 hover:border-accent focus-visible:outline-accent" disabled={Boolean(busy)} onClick={() => file.folder ? void openShare(active, [...folders, { key: file.key, name: file.name }]) : void play(file)}><span className="block break-all text-sm">{file.folder ? '📁 ' : ''}{file.name}</span><span className="block text-xs text-faint mt-1">{file.folder ? '打开文件夹' : `${(file.size / 1024 / 1024 / 1024).toFixed(2)} GB · ${busy === file.key ? '正在准备…' : status?.connected ? '转存并播放' : '扫码后播放'}`}</span></button>)}</div>
+        <div className="grid gap-2 sm:grid-cols-2">{listing.items.map((file) => file.folder ? <button key={file.key} className="text-left min-w-0 rounded-lg border border-line p-3 hover:border-accent focus-visible:outline-accent" disabled={Boolean(busy)} onClick={() => void openShare(active, [...folders, { key: file.key, name: file.name }])}><span className="block break-all text-sm">📁 {file.name}</span><span className="block text-xs text-faint mt-1">打开文件夹</span></button> : <div key={file.key} className="min-w-0 rounded-lg border border-line p-3"><span className="block break-all text-sm">{file.name}</span><span className="block text-xs text-faint mt-1">{(file.size / 1024 ** 3).toFixed(2)} GB{busy === file.key ? ' · 正在准备…' : ''}</span><div className="flex flex-wrap gap-2 mt-3"><button className="btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => void play(file)}>免转存试看</button><button className="btn-primary btn-sm" disabled={Boolean(busy)} onClick={() => void play(file, true)}>转存后播放</button></div></div>)}</div>
         {!listing.items.length && <p className="text-muted text-sm py-5">当前页没有视频或子目录。</p>}
         <div className="flex gap-2 mt-3">{listing.page > 1 && <button className="btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => void openShare(active, folders, listing.page - 1)}>上一页</button>}{listing.hasMore && <button className="btn-ghost btn-sm" disabled={Boolean(busy)} onClick={() => void openShare(active, folders, listing.page + 1)}>下一页</button>}<a href={active.url} className="btn-ghost btn-sm" target="_blank" rel="noopener noreferrer">在夸克中打开 ↗</a></div>
-        {playing && <><div className="flex flex-wrap gap-2 mt-4">{playing.qualities.map((q) => <button key={q.url} className={q.url === playing.quality.url ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'} onClick={() => setPlaying({ ...playing, quality: q })}>{q.label}</button>)}</div><NetdiskPlayer key={playing.file.key} title={playing.file.name} quality={playing.quality} identity={playing.file.identity} onRefresh={() => void play(playing.file)} onNext={next ? () => void play(next) : undefined} /></>}
+        {playing && <>{!playing.saved && <p role="status" className="mt-4 rounded-lg bg-chip p-3 text-sm text-warning">当前为免转存试看{playing.duration ? `，实际可播约 ${Math.floor(playing.duration / 60)} 分 ${playing.duration % 60} 秒` : '，可播时长由夸克限制'}{playing.sourceDuration ? `（原视频约 ${Math.ceil(playing.sourceDuration / 60)} 分钟）` : ''}。试看不会保存文件，也不会自动转存。</p>}<div className="flex flex-wrap gap-2 mt-4">{playing.qualities.map((q) => <button key={q.url} className={q.url === playing.quality.url ? 'btn-primary btn-sm' : 'btn-ghost btn-sm'} onClick={() => setPlaying({ ...playing, quality: q })}>{q.label}</button>)}</div><NetdiskPlayer key={playing.file.key + ':' + playing.saved} title={playing.file.name} quality={playing.quality} identity={playing.file.identity + (playing.saved ? '' : ':preview')} saved={playing.saved} limited={playing.limited} onRefresh={() => void play(playing.file, playing.saved, true)} onNext={next && playing.saved ? (automatic) => void play(next, true, automatic) : undefined} /></>}
       </section>}
       <div aria-live="polite" className="text-sm text-muted mb-3">{searching ? `正在搜索，已找到 ${rows.length} 个分享…` : searched ? `“${searched}” · ${rows.length} 个分享` : '从搜一部想看的影片开始。'}</div>
       {failures.length > 0 && <details className="text-xs text-faint mb-4"><summary className="cursor-pointer">{failures.length} 个来源暂未完成，其他结果可继续使用</summary>{failures.map((f) => <p key={f} className="mt-1">{f}</p>)}</details>}

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { libraryGuard } from '@/lib/library-api-server';
-import { quarkStatus, startQuarkLogin, pollQuarkLogin, disconnectQuark, listQuarkShare, playQuarkFile } from '@/lib/quark-server';
+import { quarkStatus, startQuarkLogin, pollQuarkLogin, disconnectQuark, listQuarkShare, playQuarkFile, previewQuarkFile } from '@/lib/quark-server';
 import { panSources } from '@/lib/netdisk-search';
 import { PanError } from '@/lib/netdisk-utils';
 import { panBody, panFailure } from '@/lib/netdisk-http';
@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       case 'poll': value = await pollQuarkLogin(req, text('id')); break;
       case 'disconnect': value = disconnectQuark(); break;
       case 'list': value = await listQuarkShare(req, text('shareUrl'), text('passcode'), text('parentKey'), Number(body.page || 1)); break;
+      case 'preview': value = await previewQuarkFile(req, text('key')); break;
       case 'play':
         if (body.saveConsent !== true) throw new PanError('播放此分享需要确认转存到 JjBiTV 追剧目录', 409);
         value = await playQuarkFile(req, text('key')); break;

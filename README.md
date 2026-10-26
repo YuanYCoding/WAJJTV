@@ -7,7 +7,7 @@
 - 豆瓣/百度榜单与 Bangumi 本周放送。
 - 多源并发流式搜索、备用接口去重；失效源暂时隔离，后台复检成功后恢复。
 - 第一页先显示、成功源单独缓存、较快的健康接口优先；换源候选逐个就绪。
-- 网盘追剧：最近更新、分享搜索、夸克扫码、嵌套目录、按集转存播放、原文件及平台提供的转码线路。
+- 网盘追剧：最近更新、分享搜索、夸克扫码、嵌套目录、免转存试看、确认后按集转存播放、平台实际提供的画质。
 - 影院宽屏、定时暂停，私人插画 ETag 缓存与异步海报解码。
 - 沿用 LibreTV 播放器、观看历史、收藏、直播与配置格式。
 - 影片详情预览，并可带片名跳转到网盘搜索。现有界面沿用线上 JjBiTV v4 的简化入口；旧片单数据保留。
@@ -35,7 +35,7 @@ npm run build
 
 [当前部署、探测频率与回滚](docs/operations.md) · [源实测记录](docs/source-audit.json) · [新增来源订阅](docs/verified-additions.json) · [设计约定](docs/design.md)
 
-[V5 夸克网盘追剧说明](docs/netdisk-v5.md)。网盘需配置 `CLOUD_ENCRYPTION_KEY`，并由使用者本人扫码；普通账号可用画质和速度由网盘返回。历史 [V3 说明](docs/cloud-and-playback.md) 与 [来源抽检](docs/source-audit-v3.json) 保留作参考，其中阿里云盘与双人片单界面已在 v4 撤下。
+[夸克网盘追剧说明及 V6 修复](docs/netdisk-v5.md)。网盘需配置 `CLOUD_ENCRYPTION_KEY`，并由使用者本人扫码；普通账号可用画质和速度由网盘返回。免转存接口可能只提供短时试看，页面不会将源时长当作完整可播时长。历史 [V3 说明](docs/cloud-and-playback.md) 与 [来源抽检](docs/source-audit-v3.json) 保留作参考，其中阿里云盘与双人片单界面已在 v4 撤下。
 
 [双人片单、数据接口与 V2 部署说明](docs/shared-library.md)。V2 需要持久化数据库目录；容器采用 Debian Bookworm 的 Node 22，Compose 示例已包含数据卷。`SITE_ORIGIN` 必须与浏览器访问的网站 origin 一致。
 
