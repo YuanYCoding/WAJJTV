@@ -6,8 +6,8 @@ import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'WAJJTV · 海清和静静的私人影院',
-    template: '%s - WAJJTV',
+    default: 'JjBiTV · 海清和静静的私人影院',
+    template: '%s - JjBiTV',
   },
   description:
     '海清和静静自用追剧资源。一起发现好电影、好剧集，收藏每一段共度的时光。',
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   // 图标与门户站（LibreTV-portal）同一套：同一张 artwork 导出的多尺寸 + 根目录 favicon.ico 兜底。
   // 只声明单张 512 时，抓取端只能拿大图缩放，小尺寸下易糊、看起来「没填满」。
   robots: { index: false, follow: false },
-  icons: { icon: [{ url: '/icons/wajjtv.svg', type: 'image/svg+xml' }], apple: [{ url: '/icons/wajjtv-192.png', sizes: '192x192' }] },
+  icons: { icon: [{ url: '/icons/jjbitv-192.png', type: 'image/png' }], apple: [{ url: '/icons/jjbitv-192.png', sizes: '192x192' }] },
 };
 
 export const viewport: Viewport = {

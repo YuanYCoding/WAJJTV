@@ -344,7 +344,7 @@ async function searchStream(
         received.set(event.sourceKey, event);
         onSource(event);
       } else if (event.type === 'done') {
-        final = { list: event.list, failures: event.failures };
+        final = { list: event.list, failures: event.failures, stats: event.stats };
       }
     }); } catch (err) {
       if (signal?.aborted || !received.size) throw err;

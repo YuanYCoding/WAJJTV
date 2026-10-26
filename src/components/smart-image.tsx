@@ -6,6 +6,7 @@ import { buildImageCandidates } from '@/lib/utils';
 interface SmartImageProps {
   /** 原始图片地址（未经代理加工，降级链由本组件按加载方式生成） */
   url?: string;
+  fallbackUrls?: string[];
   mode: 'direct' | 'proxy' | 'custom';
   customProxy?: string;
   alt: string;
@@ -23,6 +24,7 @@ interface SmartImageProps {
  */
 export function SmartImage({
   url,
+  fallbackUrls = [],
   mode,
   customProxy = '',
   alt,
@@ -30,17 +32,15 @@ export function SmartImage({
   loading = 'lazy',
   onExhausted,
 }: SmartImageProps) {
-  const candidates = buildImageCandidates(url, mode, customProxy);
-  const [idx, setIdx] = useState(0);
+  const candidates = buildImageCandidates(url, mode, customProxy, fallbackUrls);
+  const [failed, setFailed] = useState<Set<string>>(() => new Set());
+  const src = candidates.find((candidate) => !failed.has(candidate));
 
-  // 地址或加载方式变化时重置降级进度
-  useEffect(() => setIdx(0), [url, mode, customProxy]);
+  // Remember failed URLs so streaming result reordering cannot reset the fallback chain.
   useEffect(() => {
-    if (idx >= candidates.length) onExhausted?.();
-    // 候选数组随 url/mode 变化，length 是充分的稳定信号
-  }, [idx, candidates.length, onExhausted]);
+    if (!src) onExhausted?.();
+  }, [src, onExhausted]);
 
-  const src = candidates[idx];
   if (!src) return null;
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -51,7 +51,7 @@ export function SmartImage({
       loading={loading}
       decoding="async"
       referrerPolicy="no-referrer"
-      onError={() => setIdx((i) => i + 1)}
+      onError={() => setFailed((previous) => new Set(previous).add(src))}
     />
   );
 }

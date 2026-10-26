@@ -16,12 +16,11 @@ describe('source recovery policy', () => {
     const recovered = nextHealth(h, true, 200, undefined, 500);
     expect(recovered).toMatchObject({ status: 'healthy', failures: 0, recoveryLevel: 0, nextCheckAt: 500 + HEALTHY_INTERVAL });
   });
-  it('deduplicates known mirrors without merging unrelated custom API paths', () => {
-    expect(sourceIdentity('https://api.ffzyapi.com/api.php/provide/vod')).toBe(sourceIdentity('http://cj.ffzyapi.com/api.php/provide/vod'));
-    expect(sourceIdentity('https://ffzy5.tv/api.php/provide/vod')).toBe(sourceIdentity('http://ffzy.tv/api.php/provide/vod'));
-    expect(sourceIdentity('https://www.huyaapi.com/api.php/provide/vod/from/hym3u8')).toBe(sourceIdentity('https://www.huyaapi.com/api.php/provide/vod'));
-    expect(sourceIdentity('https://subocj.com/api.php/provide/vod')).toBe(sourceIdentity('https://subocaiji.com/api.php/provide/vod'));
-    expect(sourceIdentity('https://maoyanzy.com/api.php/provide/vod')).toBe(sourceIdentity('https://api.maoyanapi.top/api.php/provide/vod'));
+  it('keeps independent mirror endpoints searchable and only removes exact URL duplicates', () => {
+    expect(sourceIdentity('https://api.ffzyapi.com/api.php/provide/vod')).not.toBe(sourceIdentity('http://cj.ffzyapi.com/api.php/provide/vod'));
+    expect(sourceIdentity('https://www.huyaapi.com/api.php/provide/vod/from/hym3u8')).not.toBe(sourceIdentity('https://www.huyaapi.com/api.php/provide/vod'));
+    expect(sourceIdentity('https://cms.example/api/')).toBe(sourceIdentity('https://cms.example/api'));
+    expect(sourceIdentity('https://cms.example/api')).not.toBe(sourceIdentity('http://cms.example/api'));
     expect(sourceIdentity('https://my.example/a')).not.toBe(sourceIdentity('https://my.example/b'));
   });
 });

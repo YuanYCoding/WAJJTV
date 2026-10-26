@@ -1,15 +1,15 @@
-# WAJJTV 运维与回滚
+# JjBiTV 运维与回滚
 
 ## 当前部署
 
 - 基线：LibreTV 2.16.12，原容器 `libretv`，`127.0.0.1:18080`。
-- 当前新版：基于 LibreTV 2.19.7，版本 `2.19.7-wajjtv.3`，镜像 `wajjtv:v3-20261023`，容器 `wajjtv-v3`，`127.0.0.1:18084`。
-- 本次回滚目标：WAJJTV v2，镜像 `wajjtv:v2-20261021`，容器 `wajjtv-v2` 已停止并保留，`127.0.0.1:18082`。
+- 当前新版：基于线上 JjBiTV v4，版本 `2.19.7-jjbitv.5`，镜像 `jjbitv:v5-20261026`，容器 `jjbitv-v5`，`127.0.0.1:18088`。
+- 本次回滚目标：JjBiTV v4，镜像 `jjbitv:20261024`，容器 `jjbitv`，`127.0.0.1:18087`。更早 WAJJTV v3 / v2 继续保留。
 - 更早 WAJJTV v1：容器 `wajjtv`，`127.0.0.1:18081`，继续保留。
 - 域名：`https://zhuiju.zhaxueit.cn/`，由 Nginx 转发；保留流式响应的 `proxy_buffering off`。
-- 新配置：`/opt/wajjtv-v3/.env`。沿用原访问密码及 `SITE_ORIGIN`，增加独立的 `CLOUD_ENCRYPTION_KEY`；不要提交到仓库。
+- 新配置：`/opt/jjbitv-v5-20261026/.env`。沿用原访问密码及 `SITE_ORIGIN`，增加独立的 `CLOUD_ENCRYPTION_KEY`；不要提交到仓库。
 - 私人插画：`/opt/wajjtv-v2/private/mascots.png`，只读挂载到 `/app/private`，需登录访问 `/api/couple-art`。
-- 健康状态与片单数据库：`/opt/wajjtv-v2/data` 挂载到 `/app/data`，容器用户 UID/GID 1001 需要写权限。
+- 健康状态、旧片单数据库与夸克加密凭证：`/opt/jjbitv-20261024/data` 挂载到 `/app/data`，容器用户 UID/GID 1001 需要写权限。
 - 历史记录与偏好沿用原 IndexedDB / localStorage 名称，保留原有用户数据兼容性。
 
 ## 回滚
@@ -17,16 +17,16 @@
 在服务器执行：
 
 ```sh
-sh /opt/wajjtv-v3/rollback.sh
+sh /opt/jjbitv-v5-20261026/rollback.sh
 ```
 
-该脚本启动保留的 WAJJTV v2 容器，检查服务就绪，恢复 Nginx 转发到 18082，验证后平滑重载并停止 V3。仍使用 `/opt/wajjtv-v2/data` 中的现有片单数据，不删除云盘加密文件。更早的 `/opt/wajjtv-v2/rollback.sh` 指向 v1，`/opt/wajjtv/rollback.sh` 指向 LibreTV 原版，不是本次回滚入口。
+该脚本启动保留的 JjBiTV v4 容器，确认就绪后恢复 Nginx 至 18087，并停止 v5。现有数据目录保留，新增夸克凭证不会删除。更早版本的回滚脚本不是本次默认目标。
 
-本次备份：`/opt/backups/wajjtv-v2-before-sources-20261023-191103`，包含运行镜像、配置、私人素材、SQLite 一致性快照、TLS、Nginx、源码归档和校验和；已验证归档 SHA256、原镜像读取数据库、完整性检查。切换前再次保存 `precutover-*.sqlite`。本次预发布使用隔离数据目录在 18084 验证，再切换到原持久化目录。原有 2 部影片、2 条偏好在重启和切换后均保留。
+本次备份：`/opt/backups/jjbitv-v4-before-quark-20261026-095148`，含运行镜像、源码、配置、SQLite 一致性快照、数据和素材。SHA256 与数据库完整性检查已通过；切换前另存 `precutover-*.sqlite`。
 
-更早的 v1 备份 `/opt/backups/wajjtv-v1-before-v2-20261021-194353` 仍保留；该备份此前完成过隔离端口的完整恢复演练。
+预发布在 18088 使用独立 `preview-data`；正式运行挂载既有 `/opt/jjbitv-20261024/data`。网盘凭证位于 `quark-credentials.enc`，需连同 `.env` 中 `CLOUD_ENCRYPTION_KEY` 备份，不能只复制数据库。
 
-更早的 LibreTV 原版备份仍在 `/opt/backups/wajjtv-before-20261021-171816`。备份含私密配置，不上传公共仓库。
+保留的旧备份：`/opt/backups/wajjtv-v2-before-sources-20261023-191103`、`/opt/backups/wajjtv-v1-before-v2-20261021-194353`、`/opt/backups/wajjtv-before-20261021-171816`。备份含私密配置，不上传公共仓库。
 
 ## 源健康规则
 

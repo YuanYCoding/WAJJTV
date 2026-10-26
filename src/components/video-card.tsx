@@ -44,7 +44,10 @@ function buildGroup(name: string, year: string | undefined, items: SearchResultI
  */
 export function aggregateResults(list: SearchResultItem[]): AggregatedGroup[] {
   const byName = new Map<string, SearchResultItem[]>();
-  for (const item of list) {
+  for (const original of list) {
+    // Some catalogues suffix a year with an open-ended dash (2019–).
+    const year = original.year?.trim().replace(/^(\d{4})\s*[-–—]\s*$/, '$1');
+    const item = year === original.year ? original : { ...original, year };
     const k = (item.name || '').trim();
     if (!k) continue;
     if (!byName.has(k)) byName.set(k, []);
@@ -85,6 +88,9 @@ export function AggregatedCard({
   const customImageProxy = useAppStore((s) => s.customImageProxy);
   const [imgFailed, setImgFailed] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const posters = useMemo(() => [...new Set(group.items.map((item) => item.pic).filter((pic): pic is string => !!pic))], [group.items]);
+  const posterSignature = posters.join('\n');
+  useEffect(() => setImgFailed(false), [posterSignature]);
   const showImg = !!group.pic && !imgFailed;
 
   const multi = group.items.length > 1;
@@ -166,6 +172,7 @@ export function AggregatedCard({
           <div className="relative flex-shrink-0 w-[105px] sm:w-[120px] aspect-[2/3] bg-chip">
             <SmartImage
               url={group.pic}
+              fallbackUrls={posters}
               mode={imageProxyMode}
               customProxy={customImageProxy}
               alt={group.name}

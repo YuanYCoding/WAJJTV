@@ -18,23 +18,10 @@ export function nextHealth(previous: SourceHealth | undefined, ok: boolean, ms?:
   return { status: unavailable ? 'unavailable' : 'suspect', failures, recoveryLevel: level, checkedAt: now, nextCheckAt: now + (unavailable ? RECOVERY_DELAYS[level] : 60_000), ms, error };
 }
 
-/** Explicit provider aliases only. Other user-defined paths retain their identity. */
+/** Only identical endpoints share identity: mirrors can have different availability/catalogues. */
 export function sourceIdentity(raw: string): string {
   try {
     const u = new URL(raw);
-    const families = [
-      ['modu', /(^|\.)(mdzyapi\.com|moduapi\.cc)$/],
-      ['hongniu', /(^|\.)hongniuzy[23]\.com$/],
-      ['jinying', /(^|\.)(jyzyapi\.com|jinyingzy\.com)$/],
-      ['ffzy', /(^|\.)(ffzyapi\.com|ffzyapi8\.com|ffzy\.tv|ffzy5\.tv)$/],
-      ['lzi', /(^|\.)lziapi\.com$/],
-      ['360zy', /(^|\.)(360zy\.com|360zyzz\.com)$/],
-      ['zuid', /(^|\.)(zuidapi\.com|zuidazy\.me)$/],
-      ['huya', /(^|\.)huyaapi\.com$/],
-      ['subo', /(^|\.)(subocaiji\.com|subocj\.com)$/],
-      ['maoyan', /(^|\.)(maoyanapi\.top|maoyanzy\.com)$/],
-    ] as const;
-    const family = families.find(([, pattern]) => pattern.test(u.hostname));
-    return family?.[0] || `${u.host}${u.pathname.replace(/\/at\/json\/?$/, '').replace(/\/+$/, '')}${u.search}`;
+    return `${u.origin}${u.pathname.replace(/\/+$/, '')}${u.search}`;
   } catch { return raw; }
 }

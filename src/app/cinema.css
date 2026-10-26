@@ -133,3 +133,11 @@ button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid
   .site-footer { font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .poster-image, .poster-hover { transition: none; } }
+
+/* The first rendered surface contains only the password gate. */
+.login-gate{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 20%,#302818 0%,#101111 65%);color:#eee}
+.login-card{width:min(100%,400px);padding:36px 32px;border:1px solid #4b4231;border-radius:24px;background:#191a18;box-shadow:0 20px 80px #0005;text-align:center}
+.login-logo{display:block;margin:0 auto 16px;border-radius:22px}
+.login-wordmark{font-size:30px;font-weight:750;letter-spacing:-1px;color:#e3bd70;margin-bottom:24px}
+.login-card form{text-align:left}.login-card input{min-height:48px}.login-card button{min-height:48px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}

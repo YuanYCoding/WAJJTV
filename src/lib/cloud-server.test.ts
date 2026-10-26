@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloudVault, cloudVault } from './cloud-vault';
 import { beginCloudLogin, finishCloudLogin, cloudStatus, cloudFiles, cloudPlayback, disconnectCloud, cloudMedia } from './cloud-server';
 import { GET, POST } from '@/app/api/cloud/route';
-import { SESSION_COOKIE, signSession } from './auth';
 
 let dir: string;
 const owner = new Request('https://cinema.test/api/cloud', { headers: { cookie: 'session=owner' } });
@@ -65,11 +64,9 @@ describe('cloud account and playback boundary', () => {
     const id = new URL(play.qualities[0].url, owner.url).searchParams.get('id')!;
     disconnectCloud(); await expect(cloudMedia(id, owner)).rejects.toThrow('过期');
   });
-  it('unauthenticated reads and cross-origin writes cannot reach the provider', async () => {
+  it('removed cloud endpoints return gone and cannot reach the provider', async () => {
     const spy = vi.fn(); vi.stubGlobal('fetch', spy);
-    expect((await GET(new Request(owner.url))).status).toBe(401);
-    const { token } = signSession();
-    const req = new Request(owner.url, { method: 'POST', headers: { cookie: `${SESSION_COOKIE}=${token}`, Origin: 'https://evil.test', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'login' }) });
-    expect((await POST(req)).status).toBe(403); expect(spy).not.toHaveBeenCalled();
+    expect((await GET()).status).toBe(410);
+    expect((await POST()).status).toBe(410); expect(spy).not.toHaveBeenCalled();
   });
 });

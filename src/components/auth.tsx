@@ -44,7 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [verified, setVerified] = useState(false);
   const [setupRequired, setSetupRequired] = useState(false);
   const [version, setVersion] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -74,12 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const setup = (event as CustomEvent).detail === 'setup';
         setSetupRequired(setup);
         setVerified(false);
-        setModalOpen(true);
       }),
     []
   );
 
-  const openLogin = useCallback(() => setModalOpen(true), []);
+  const openLogin = useCallback(() => setVerified(false), []);
 
   const logout = useCallback(async () => {
     try {
@@ -93,7 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleLoginSuccess = useCallback(async () => {
     setVerified(true);
     setSetupRequired(false);
-    setModalOpen(false);
     // 登录前以 401 失败的查询（如豆瓣推荐）需要重新拉取
     queryClient.invalidateQueries();
     toast('验证成功', 'success');
@@ -116,26 +113,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ checked, verified, setupRequired, version, openLogin, logout }}>
-      {children}
-      {modalOpen && (
-        <LoginModal
-          setupRequired={setupRequired}
-          onSuccess={handleLoginSuccess}
-          onClose={() => setModalOpen(false)}
-        />
-      )}
+      {verified ? children : checked ? (
+        <LoginGate setupRequired={setupRequired} onSuccess={handleLoginSuccess} />
+      ) : <main className="login-gate" aria-busy="true"><p className="text-muted" role="status">正在打开 JjBiTV…</p></main>}
     </AuthContext.Provider>
   );
 }
 
-function LoginModal({
+function LoginGate({
   setupRequired,
   onSuccess,
-  onClose,
 }: {
   setupRequired: boolean;
   onSuccess: () => void;
-  onClose: () => void;
 }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -145,14 +135,6 @@ function LoginModal({
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
 
   const submit = async () => {
     if (!password.trim() || loading) return;
@@ -172,18 +154,11 @@ function LoginModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 animate-fade-in"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="bg-surface-raised rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl"
-        role="dialog"
-        aria-modal="true"
-        aria-label={setupRequired ? '需要配置密码' : '访问验证'}
-      >
+    <main className="login-gate">
+      <div className="login-card">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/icons/jjbitv-192.png" alt="海清和静静的 JjBiTV" width="88" height="88" className="login-logo" />
+        <p className="login-wordmark">JjBiTV</p>
         {setupRequired ? (
           <>
             <h2 className="text-lg font-semibold text-content mb-3">需要配置密码</h2>
@@ -194,8 +169,8 @@ function LoginModal({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-content mb-1">访问验证</h2>
-            <p className="text-sm text-muted mb-4">请输入密码继续访问</p>
+            <h2 className="text-lg font-semibold text-content mb-1">欢迎回到私人放映室</h2>
+            <p className="text-sm text-muted mb-4">输入访问密码，开始今晚的好故事。</p>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -208,17 +183,18 @@ function LoginModal({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="input w-full"
+                aria-label="访问密码"
                 placeholder="密码"
                 autoComplete="current-password"
               />
               {error && <p className="mt-2 text-sm text-danger">{error}</p>}
               <button type="submit" className="btn-primary w-full mt-4" disabled={loading || !password.trim()}>
-                {loading ? '验证中...' : '进入'}
+                {loading ? '验证中...' : '进入 JjBiTV'}
               </button>
             </form>
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

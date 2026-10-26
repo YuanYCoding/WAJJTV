@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, startTransition, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
@@ -107,7 +107,7 @@ function HomeContent() {
         signal,
         // 逐源结算即更新：结果边搜边渲染，同时滚动健康度
         onSource: (outcome) => {
-          setStreamedOutcomes((prev) => [...prev.filter((item) => item.sourceKey !== outcome.sourceKey), outcome]);
+          startTransition(() => setStreamedOutcomes((prev) => [...prev.filter((item) => item.sourceKey !== outcome.sourceKey), outcome]));
           if (outcome.partial || outcome.cached) return;
           for (const ev of useAppStore.getState().recordSourceHealth([outcome])) {
             toast(
@@ -166,12 +166,13 @@ function HomeContent() {
       .filter((o) => !o.ok)
       .map((o) => ({ sourceKey: o.sourceKey, error: o.error || '请求失败', timedOut: o.timedOut }));
   // 跨源同名聚合：同名影片合并为一张卡片，展开后可选择具体来源
-  const groups = useMemo(() => aggregateResults(list), [list]);
+  const deferredList = useDeferredValue(list);
+  const groups = useMemo(() => aggregateResults(deferredList), [deferredList]);
 
-  // 分批渲染：新一次搜索（groups 变化）时重置回首批
+  // Only a new query resets pagination; late source responses must not collapse expanded results.
   const [visibleCount, setVisibleCount] = useState(RESULT_PAGE_SIZE);
   const visibleGroups = useMemo(() => groups.slice(0, visibleCount), [groups, visibleCount]);
-  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [groups]);
+  useEffect(() => setVisibleCount(RESULT_PAGE_SIZE), [urlQuery]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -187,7 +188,7 @@ function HomeContent() {
               <p>海清和静静自用追剧资源</p>
             </header>
           )}
-          {urlQuery && <h1 className="sr-only">WAJJTV 视频搜索</h1>}
+          {urlQuery && <h1 className="sr-only">JjBiTV 视频搜索</h1>}
           {/* 定位容器比胶囊宽一圈：浮层按它的宽度对齐，接缝处不会与胶囊边框错位 1px */}
           <div ref={searchHistory.containerRef} className="hero-search-box relative w-full">
             <form
@@ -300,6 +301,7 @@ function HomeContent() {
               </h2>
             </div>
 
+            {searchQuery.data?.stats && <p className="mb-3 text-xs text-muted" role="status">已查询 {searchQuery.data.stats.queried} 个接口 · {searchQuery.data.stats.matched} 个有结果 · {searchQuery.data.stats.empty} 个无匹配 · {searchQuery.data.stats.failed} 个失败。同片下的“来源”是命中该片的接口数。</p>}
             {searchQuery.isError && <p role="alert" className="mb-4 text-warning">搜索服务暂时不可用，请重试。<button className="btn-ghost ml-2" onClick={() => void searchQuery.refetch()}>重试</button></p>}
             {failures.length > 0 && (
               <div className="mb-3 text-xs bg-chip rounded-lg px-3 py-2 flex flex-wrap gap-x-3 gap-y-1">
@@ -405,7 +407,7 @@ function NoSourceGuide({ hasSources = false }: { hasSources?: boolean }) {
           <>点击右上角「设置」，勾选要参与搜索的点播源后重新搜索。</>
         ) : (
           <>
-            WAJJTV 支持配置自己的点播源。点击右上角「设置 → 添加 API」，填入一个
+            JjBiTV 支持配置自己的点播源。点击右上角「设置 → 添加 API」，填入一个
             Apple CMS 采集站地址（如 <code className="text-accent text-xs">https://example.com/api.php/provide/vod</code>），
             勾选后即可开始搜索。
           </>

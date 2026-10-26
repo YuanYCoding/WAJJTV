@@ -63,6 +63,26 @@ afterEach(() => {
 });
 
 describe('POST /api/search', () => {
+  it('retries a transient first-page 503 once within the source deadline', async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(new Response('temporarily unavailable', { status: 503 }))
+      .mockResolvedValueOnce(new Response(cmsList([{ vod_id: 1, vod_name: '临时恢复' }])));
+    vi.stubGlobal('fetch', fetchSpy);
+    const source = { key: 'retry-503', name: '暂时繁忙', url: 'https://cms.example.com/retry-503' };
+    const data = await (await POST(makeRequest({ wd: '临时恢复', sources: [source] }))).json();
+    expect(data.list).toHaveLength(1);
+    expect(data.failures).toEqual([]);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('searches every distinct endpoint beyond fifty and reports unmatched sources separately', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => new Response(cmsList(new URL(String(input)).pathname.endsWith('/empty') ? [] : [{vod_id:1,vod_name:'全源覆盖'}]))));
+    const sources = Array.from({length:61}, (_,i)=>({key:`coverage-${i}`,name:`源${i}`,url:`https://cms.example.com/coverage-${i}${i===60?'/empty':''}`}));
+    const res=await POST(makeRequest({wd:'全源覆盖',sources}));
+    const data=await res.json();
+    expect(data.list).toHaveLength(60);
+    expect(data.stats).toEqual({queried:61,matched:60,empty:1,failed:0});
+  });
   it('第一页立即显示，第二页失败也保留第一页且只结算一次健康度', async () => {
     let release!: () => void;
     const pending = new Promise<void>((resolve) => { release = resolve; });
@@ -263,11 +283,11 @@ describe('POST /api/search', () => {
     expect(events[0]).toMatchObject({ type: 'source', ok: true });
     expect(events[1]).toMatchObject({ type: 'done', failures: [] });
     const cached = await POST(makeRequest(body));
-    expect(await cached.json()).toEqual({ list: [], failures: [] });
+    expect(await cached.json()).toMatchObject({ list: [], failures: [] });
     const cachedStream = await POST(makeRequest(body, true));
-    expect(JSON.parse((await cachedStream.text()).trim())).toEqual({ type: 'done', list: [], failures: [] });
+    expect(JSON.parse((await cachedStream.text()).trim())).toMatchObject({ type: 'done', list: [], failures: [] });
     const fresh = await POST(makeRequest({ ...body, sources: [{ ...body.sources[0], url: body.sources[0].url + '/fresh' }] }));
-    expect(await fresh.json()).toEqual({ list: [], failures: [] });
+    expect(await fresh.json()).toMatchObject({ list: [], failures: [] });
   });
 
   it('未登录返回 401，未配置密码返回 503', async () => {

@@ -117,12 +117,13 @@ export interface QualityProbeResult {
 export interface SearchResponse {
   list: SearchResultItem[];
   failures: { sourceKey: string; error: string; timedOut?: boolean }[];
+  stats?: { queried: number; matched: number; empty: number; failed: number };
 }
 
 /** /api/search?stream=1 的 NDJSON 事件：逐源推送 + 最终聚合 */
 export type SearchStreamEvent =
   | ({ type: 'source' } & SourceSearchOutcome)
-  | { type: 'done'; list: SearchResultItem[]; failures: SearchResponse['failures'] };
+  | ({ type: 'done' } & SearchResponse);
 
 export interface DoubanResponse {
   items: DoubanItem[];

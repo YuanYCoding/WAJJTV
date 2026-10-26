@@ -98,11 +98,18 @@ async function searchSource(source: SourceConfig, wd: string, signal?: AbortSign
   const base = source.url.replace(/\/+$/, '');
   const fetchPage = async (page: number) => {
     const api = cmsUrl(base, { ac: 'detail', wd, pg: String(page) });
-    const res = await fetchUpstream(api, {
+    const fetchOptions = {
       timeoutMs: page === 1 ? SEARCH_SOURCE_TIMEOUT_MS : 2000,
       headers: cmsRequestHeaders(),
       signal: controller.signal,
-    });
+    };
+    let res = await fetchUpstream(api, fetchOptions);
+    // A busy upstream may recover immediately; keep the retry inside the same source deadline.
+    if (page === 1 && [502, 503, 504].includes(res.status)) {
+      await res.body?.cancel();
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      res = await fetchUpstream(api, fetchOptions);
+    }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!data || !Object.prototype.hasOwnProperty.call(data, 'list') || (data.list !== null && !Array.isArray(data.list)) || data.code === 0) throw new Error('无效的影视列表');
@@ -194,7 +201,21 @@ function aggregateOutcomes(outcomes: SourceSearchOutcome[], wd: string, filterAd
     .filter((o) => !o.ok)
     .map((o) => ({ sourceKey: o.sourceKey, error: o.error || '请求失败', timedOut: o.timedOut }));
 
-  return { list, failures };
+  const matched = new Set(list.map((item) => item.sourceKey)).size;
+  return { list, failures, stats: { queried: outcomes.length, matched, empty: outcomes.filter((o) => o.ok).length - matched, failed: failures.length } };
+}
+
+/** Keep upstream traffic bounded as the catalogue grows; fast sources stream immediately. */
+async function searchWithConcurrency<T>(sources: SourceConfig[], task: (source: SourceConfig, index: number) => Promise<T>): Promise<T[]> {
+  const results: T[] = new Array(sources.length);
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(12, sources.length) }, async () => {
+    while (cursor < sources.length) {
+      const index = cursor++;
+      results[index] = await task(sources[index], index);
+    }
+  }));
+  return results;
 }
 
 /**
@@ -234,7 +255,7 @@ export async function POST(req: Request) {
     if (seen.has(identity)) return false;
     seen.add(identity);
     return true;
-  }).slice(0, 50);
+  }).slice(0, 100);
   if (!sources.length) return NextResponse.json({ list: [], failures: [] });
   const filterAdult = body.filterAdult !== false;
 
@@ -243,7 +264,7 @@ export async function POST(req: Request) {
   if (cached) {
     // 流式模式下缓存命中也要走 done 事件，客户端解析逻辑保持单一
     if (new URL(req.url).searchParams.get('stream') === '1') {
-      const event: SearchStreamEvent = { type: 'done', list: cached.list, failures: cached.failures };
+      const event: SearchStreamEvent = { type: 'done', ...cached };
       return new Response(JSON.stringify(event) + '\n', {
         headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' },
       });
@@ -253,7 +274,7 @@ export async function POST(req: Request) {
 
   const isStream = new URL(req.url).searchParams.get('stream') === '1';
   if (!isStream) {
-    const outcomes = await Promise.all(sources.map((source) => searchSource(source, wd, req.signal)));
+    const outcomes = await searchWithConcurrency(sources, (source) => searchSource(source, wd, req.signal));
     const payload = aggregateOutcomes(outcomes, wd, filterAdult);
     if (outcomes.every((o) => o.ok && !o.incomplete) && !req.signal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
     return NextResponse.json(payload);
@@ -274,8 +295,7 @@ export async function POST(req: Request) {
 
       // 逐源结算即推送；outcomes 按下标回填保证聚合顺序稳定
       const outcomes: SourceSearchOutcome[] = new Array(sources.length);
-      await Promise.all(
-        sources.map(async (source, i) => {
+      await searchWithConcurrency(sources, async (source, i) => {
           const outcome = await searchSource(source, wd, req.signal, (partial) => {
             const { list } = aggregateOutcomes([partial], wd, filterAdult);
             send({ type: 'source', ...partial, list });
@@ -284,12 +304,12 @@ export async function POST(req: Request) {
           // 中间结果与最终结果共用去重和过滤规则，避免无关/成人条目短暂出现在页面上。
           const { list } = aggregateOutcomes([outcome], wd, filterAdult);
           send({ type: 'source', ...outcome, list });
-        })
-      );
+          return outcome;
+        });
 
       const payload = aggregateOutcomes(outcomes, wd, filterAdult);
       if (outcomes.every((o) => o.ok && !o.incomplete) && !req.signal.aborted) setCache(cacheKey, payload, SEARCH_CACHE_TTL);
-      send({ type: 'done', list: payload.list, failures: payload.failures });
+      send({ type: 'done', ...payload });
       closed = true;
       try {
         controller.close();

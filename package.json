@@ -1,8 +1,8 @@
 {
   "name": "libretv",
-  "version": "2.19.7-wajjtv.3",
+  "version": "2.19.7-jjbitv.5",
   "private": true,
-  "description": "WAJJTV - 海清和静静自用追剧资源，基于 LibreTV",
+  "description": "JjBiTV - 海清和静静的私人影院，基于 LibreTV",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "dev": "next dev -p 8080",
@@ -22,12 +22,14 @@
     "mpegts.js": "^1.8.2",
     "mux.js": "^6.3.0",
     "next": "^15.1.0",
+    "qrcode": "1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/qrcode": "1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "autoprefixer": "^10.4.20",
