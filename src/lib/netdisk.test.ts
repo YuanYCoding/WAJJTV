@@ -7,6 +7,7 @@ import { extractQuarkLinks, parseSearchCards } from './netdisk-search';
 import { quarkVault, quarkStatus, startQuarkLogin, pollQuarkLogin, disconnectQuark, listQuarkShare, playQuarkFile, previewQuarkFile, quarkMedia, issueQuarkMedia } from './quark-server';
 import { GET, POST } from '@/app/api/netdisk/route';
 import { SESSION_COOKIE, signSession } from './auth';
+vi.mock('./netdisk-storage', async (importOriginal) => ({ ...await importOriginal<typeof import('./netdisk-storage')>(), ensureDiskSpace: vi.fn(async () => ({ deleted: 0, quota: { total: 1e12, used: 0, free: 1e12 } })) }));
 vi.mock('./ssrf', () => ({ checkUpstreamAllowed: vi.fn(async () => ({ ok: true })) }));
 let directory: string;
 const req = () => new Request('https://cinema.test/api/netdisk', { headers: { cookie: 'ltv_session=browser1' } });

@@ -3,15 +3,17 @@ import QRCode from 'qrcode';
 import { CloudVault } from './cloud-vault';
 import { PanError, idValue, mergeCookies, parseQuarkShare, plainText } from './netdisk-utils';
 import { checkUpstreamAllowed } from './ssrf';
+import { autoCleanupEnabled, diskQuota, ensureDiskSpace, startPlaybackLease, storageProtected, clearAccountLeases, setAutoCleanup, type CleanupAdapter, type CleanupEntry } from './netdisk-storage';
+import { canDeliverDirect, directMediaResponse, preferDirectMedia } from './netdisk-delivery';
 import type { PanFile, PanListing, PanQuality, PanPlayback } from './netdisk-types';
 
 interface QuarkAccount { id: string; cookie: string; name: string; folder?: string; saved: Record<string, string>; tasks?: Record<string, string> }
 interface Login { token: string; owner: string; expires: number; polling?: Promise<{ connected: boolean; expired?: boolean }> }
-interface FileRef { fid: string; token: string; name: string; folder: boolean; size: number; share: ReturnType<typeof parseQuarkShare>; parent: string; page: number; owner: string; expires: number; width?: number; height?: number }
+interface FileRef { fid: string; token: string; name: string; folder: boolean; size: number; share: ReturnType<typeof parseQuarkShare>; parent: string; page: number; owner: string; expires: number; ancestors?: string[]; width?: number; height?: number }
 interface Media { url: string; account: string; expires: number; kind: 'hls' | 'video' }
-interface Registry { logins: Map<string, Login>; files: Map<string, FileRef>; media: Map<string, Media>; playback: Map<string, Promise<{ qualities: PanQuality[]; saved: boolean }>> }
+interface Registry { logins: Map<string, Login>; files: Map<string, FileRef>; media: Map<string, Media>; playback: Map<string, Promise<PanPlayback>>; mediaIndex?: Map<string, string>; prunedAt?: number }
 const root = globalThis as typeof globalThis & { __jjbiQuark?: Registry };
-const registry = root.__jjbiQuark ??= { logins: new Map(), files: new Map(), media: new Map(), playback: new Map() };
+const registry: Registry = root.__jjbiQuark ??= { logins: new Map(), files: new Map(), media: new Map(), playback: new Map() };
 const DRIVE = 'https://drive-pc.quark.cn';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const owner = (req: Request) => createHash('sha256').update(req.headers.get('cookie')?.match(/(?:^|;\s*)ltv_session=([^;]+)/)?.[1] || '').digest('hex');
@@ -69,8 +71,9 @@ async function drive(path: string, value?: QuarkAccount, body?: object, query: R
 }
 export function quarkStatus() {
   const vault = quarkVault(); if (!vault.configured) return { configured: false, connected: false };
-  const value = vault.read(); return { configured: true, connected: Boolean(value), name: value?.name };
+  const value = vault.read(); return { configured: true, connected: Boolean(value), name: value?.name, autoCleanup: autoCleanupEnabled('quark', value?.id) };
 }
+export function setQuarkCleanup(enabled: boolean) { return setAutoCleanup('quark', account().id, enabled); }
 export async function startQuarkLogin(req: Request) {
   if (!quarkVault().configured) throw new PanError('网盘加密配置尚未就绪', 503);
   const result = await official('https://uop.quark.cn/cas/ajax/getTokenForQrcodeLogin?' + new URLSearchParams({ client_id: '532', v: '1.2', request_id: randomUUID() }));
@@ -109,7 +112,7 @@ export async function pollQuarkLogin(req: Request, id: string) {
   })().finally(() => { login.polling = undefined; });
   return login.polling;
 }
-export function disconnectQuark() { registry.logins.clear(); registry.media.clear(); registry.files.clear(); quarkVault().clear(); return { connected: false }; }
+export function disconnectQuark() { const a = quarkVault().configured ? quarkVault().read() : null; if (a) try { clearAccountLeases('quark', a.id); } catch { /* Logout must still revoke credentials if the lease journal is unreadable. */ } registry.logins.clear(); registry.media.clear(); registry.mediaIndex?.clear(); registry.files.clear(); quarkVault().clear(); return { connected: false }; }
 
 async function shareToken(share: ReturnType<typeof parseQuarkShare>, value?: QuarkAccount) {
   const data = await drive('share/sharepage/token', value, { pwd_id: share.id, passcode: share.passcode }) as Record<string, unknown>;
@@ -117,12 +120,13 @@ async function shareToken(share: ReturnType<typeof parseQuarkShare>, value?: Qua
   return data.stoken;
 }
 export async function listQuarkShare(req: Request, raw: string, passcode = '', parentKey = '', page = 1): Promise<PanListing> {
-  const share = parseQuarkShare(raw, passcode); let parent = '0';
+  const share = parseQuarkShare(raw, passcode); let parent = '0'; let ancestors: string[] = [];
   if (!Number.isInteger(page) || page < 1 || page > 500) throw new PanError('分页参数无效');
   if (parentKey) {
     const ref = registry.files.get(parentKey);
     if (!ref || !ref.folder || ref.owner !== owner(req) || ref.share.id !== share.id || ref.expires < Date.now()) throw new PanError('目录已过期，请重新打开分享', 409);
     parent = ref.fid;
+    ancestors = [...(ref.ancestors || []), ref.fid];
   }
   const value = quarkVault().read() || undefined;
   const stoken = await shareToken(share, value);
@@ -136,7 +140,7 @@ export async function listQuarkShare(req: Request, raw: string, passcode = '', p
     const name = plainText(file.file_name, 300);
     if (!folder && !/\.(mp4|mkv|ts|mov|avi|m4v|webm)$/i.test(name)) continue;
     const key = randomUUID(); const video = file.video_info as Record<string, unknown> | undefined;
-    const ref: FileRef = { fid: idValue(file.fid), token: String(file.share_fid_token || ''), name, folder, size: Number(file.size) || 0, share, parent, page, owner: owner(req), expires: Date.now() + 8 * 60 * 60_000, width: Number(video?.width) || undefined, height: Number(video?.height) || undefined };
+    const ref: FileRef = { fid: idValue(file.fid), token: String(file.share_fid_token || ''), name, folder, size: Number(file.size) || 0, share, parent, page, owner: owner(req), ancestors, expires: Date.now() + 8 * 60 * 60_000, width: Number(video?.width) || undefined, height: Number(video?.height) || undefined };
     const identity = createHash('sha256').update(share.id + ':' + ref.fid).digest('hex').slice(0, 32);
     registry.files.set(key, ref); items.push({ key, identity, name, folder, size: ref.size, width: ref.width, height: ref.height });
   }
@@ -205,10 +209,43 @@ async function saveShareFile(value: QuarkAccount, ref: FileRef, mapping: string)
   }
   throw new PanError('分享凭证仍未刷新，请重新打开目录', 409, 'SHARE_TOKEN_EXPIRED');
 }
+export function quarkStorageAdapter(value = account()): CleanupAdapter {
+  const list = async (parent = '0', recycle = false) => {
+    const rows: Record<string, unknown>[] = [];
+    for (let page = 1; page <= 8; page++) { const d = await drive(recycle ? 'file/recycle/list' : 'file/sort', value, undefined, { pdir_fid: parent, _page: String(page), _size: '100', _fetch_total: '1', _sort: 'updated_at:asc' }) as { list?: Record<string, unknown>[]; __metadata?: { _total?: number } }; const items = d.list || []; rows.push(...items); if (items.length < 100 || rows.length >= Number(d.__metadata?._total)) break; }
+    return rows;
+  };
+  const waitTask = async (data: Record<string, unknown>) => {
+    if (!data.task_id) return;
+    for (let n = 0; n < 8; n++) { const t = await drive('task', value, undefined, { task_id: idValue(data.task_id), retry_index: String(n) }) as Record<string, unknown>; if (Number(t.status) === 2) return; if (Number(t.status) === 3) throw new PanError('夸克清理失败，请稍后重试', 409); await new Promise((r) => setTimeout(r, 300)); }
+    throw new PanError('夸克仍在清理，请稍后重试', 409, 'CLEANUP_PENDING');
+  };
+  return {
+    provider: 'quark', account: value.id,
+    quota: async () => { const v = await drive('member', value, undefined, { fetch_subscribe: 'false', fetch_identity: 'false' }) as Record<string, unknown>; return diskQuota(v.total_capacity, v.use_capacity); },
+    candidates: async () => {
+      const out: CleanupEntry[] = [], roots = await list();
+      const add = (rows: Record<string, unknown>[], parent: string, priority: number, recycle = false) => { for (const v of rows) if (v.fid && v.fid !== value.folder) out.push({ id: idValue(v.fid), parent, size: Number(v.size) || 0, modified: Number(v.updated_at || v.created_at) || 0, priority, recycle, record: textRecord(v.record_id) }); };
+      if (value.folder && roots.some((v) => v.fid === value.folder)) add(await list(value.folder), value.folder, 1);
+      add(roots, '0', 2); add(await list('0', true), '0', 0, true); return out;
+    },
+    remove: async (entry) => {
+      if (storageProtected('quark', value.id, entry.id)) throw new PanError('该文件正在播放，已保留', 409, 'FILE_ACTIVE');
+      let record = entry.record;
+      if (!entry.recycle) { const deleted = await drive('file/delete', value, { action_type: 2, filelist: [idValue(entry.id)], exclude_fids: [] }) as Record<string, unknown>; await waitTask(deleted); record = textRecord((await list('0', true)).find((v) => v.fid === entry.id)?.record_id); }
+      const latest = account(); if (latest.id !== value.id) throw new PanError('网盘账号已更改', 409);
+      for (const [key, fid] of Object.entries(latest.saved)) if (fid === entry.id) delete latest.saved[key]; quarkVault().write(latest, latest.id); value.saved = latest.saved;
+      if (record) await waitTask(await drive('file/recycle/remove', value, { select_mode: 2, record_list: [idValue(record)] }) as Record<string, unknown>);
+    },
+  };
+}
+const textRecord = (v: unknown) => typeof v === 'string' ? v : typeof v === 'number' ? String(v) : undefined;
 async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback> {
   const mapping = ref.share.id + ':' + ref.fid;
-  let fid = value.saved[mapping];
+  let fid = value.saved[mapping]; let cleaned = 0;
   if (!fid) {
+    if (value.tasks?.[mapping] === 'uncertain') throw new PanError('上次转存结果暂未确认，请先在夸克查看「JjBiTV 追剧」目录，避免重复占用空间', 409, 'TRANSFER_UNCERTAIN');
+    if (!value.tasks?.[mapping]) cleaned = (await ensureDiskSpace(ref.size, { ...quarkStorageAdapter(value), protectedIds: [ref.fid, ...(ref.ancestors || [])] })).deleted;
     if (!value.folder) {
       const folders = await drive('file/sort', value, undefined, { pdir_fid: '0', _page: '1', _size: '100', _sort: 'file_type:asc,file_name:asc' }) as { list?: Record<string, unknown>[] };
       const existing = folders.list?.find((f) => f.file_name === 'JjBiTV 追剧' && f.file_type === 0);
@@ -232,15 +269,15 @@ async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback>
     }
     if (!fid) throw new PanError('夸克仍在转存，再次点击会继续检查，不会重复转存', 409, 'TRANSFER_PENDING');
   }
-  const [transcoded, original] = await Promise.allSettled([
-    drive('file/v2/play', value, { fid, resolutions: 'normal,low,high,super,2k,4k', supports: 'fmp4,m3u8' }),
-    drive('file/download', value, { fids: [fid] }),
-  ]);
+  const [transcoded] = await Promise.allSettled([drive('file/v2/play', value, { fid, resolutions: 'normal,low,high,super,2k,4k', supports: 'fmp4,m3u8' })]);
+  const hasStream = transcoded.status === 'fulfilled' && ((transcoded.value as { video_list?: Record<string, unknown>[] }).video_list || []).some((v) => v.accessable !== false && typeof (v.video_info as Record<string, unknown> | undefined)?.url === 'string');
+  const original = hasStream ? { status: 'fulfilled' as const, value: [] } : (await Promise.allSettled([drive('file/download', value, { fids: [fid] })]))[0];
   const qualities: PanQuality[] = [];
   if (transcoded.status === 'fulfilled') {
     const data = transcoded.value as { video_list?: Record<string, unknown>[] };
     const labels: Record<string, string> = { normal: '转码标清', low: '转码流畅', high: '转码高清', super: '转码超清', '2k': '转码 2K', '4k': '转码 4K' };
     for (const row of data.video_list || []) {
+      if (row.accessable === false) continue;
       const info = row.video_info as Record<string, unknown> | undefined;
       const url = info?.url || row.url;
       if (typeof url !== 'string' || !url.startsWith('https://')) continue;
@@ -257,17 +294,17 @@ async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback>
   if (!qualities.length) throw new PanError('夸克暂未提供可用播放地址，可能受格式、转码状态或账号权益限制，请稍后重试或在夸克 App 查看', 409);
   const payload = transcoded.status === 'fulfilled' ? transcoded.value as { meta?: { width?: number; height?: number; size?: number }; video_list?: Record<string, unknown>[] } : undefined;
   const unavailable = (payload?.video_list || []).filter((v) => v.accessable === false).map((v) => ({ '4k': '4K', super: '超清', high: '高清' }[String(v.resolution)] || String(v.resolution)));
-  return { qualities, saved: true, original: { width: Number(payload?.meta?.width) || ref.width, height: Number(payload?.meta?.height) || ref.height, size: ref.size }, unavailable, notice: unavailable.length ? '原文件画质与网页可播画质不同。夸克未向当前网页连接开放部分高清线路，可在夸克 App 中查看。' : undefined };
+  return { qualities, saved: true, cleaned, original: { width: Number(payload?.meta?.width) || ref.width, height: Number(payload?.meta?.height) || ref.height, size: ref.size }, unavailable, notice: unavailable.length ? '原文件画质与网页可播画质不同。夸克未向当前网页连接开放部分高清线路，可在夸克 App 中查看。' : undefined };
 }
 export async function playQuarkFile(req: Request, key: string) {
   const ref = fileReference(req, key);
   const value = account(); const lock = value.id;
   // Serialize cloud mutations across tabs so folder creation and save mappings cannot overwrite each other.
   const previous = registry.playback.get(lock);
-  const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(() => {
+  const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(async () => {
     const current = account();
     if (current.id !== value.id) throw new PanError('夸克连接已更改，请刷新后重试', 409);
-    return playback(current, ref);
+    const result = await playback(current, ref); return { ...result, lease: startPlaybackLease(req, 'quark', current.id, current.saved[ref.share.id + ':' + ref.fid], [current.folder || '']) };
   });
   registry.playback.set(lock, task);
   try { return await task; } finally { if (registry.playback.get(lock) === task) registry.playback.delete(lock); }
@@ -279,10 +316,13 @@ function mediaHost(raw: string) {
 }
 export function issueQuarkMedia(url: string, accountId: string, kind: 'hls' | 'video') {
   mediaHost(url);
-  for (const [id, item] of registry.media) if (item.expires < Date.now()) registry.media.delete(id);
-  for (const [id, item] of registry.media) if (item.url === url && item.account === accountId) return '/api/netdisk/media?id=' + id;
+  const index = registry.mediaIndex ??= new Map<string, string>(), now = Date.now();
+  if (now - (registry.prunedAt || 0) > 60_000) { for (const [id, item] of registry.media) if (item.expires < now) { registry.media.delete(id); index.delete(item.account + '\n' + item.url); } registry.prunedAt = now; }
+  const key = accountId + '\n' + url, prior = index.get(key);
+  if (prior && (registry.media.get(prior)?.expires || 0) > now) return '/api/netdisk/media?id=' + prior;
   if (registry.media.size > 10_000) throw new PanError('播放请求较多，请稍后重试', 429);
   const id = randomUUID(); registry.media.set(id, { url, account: accountId, kind, expires: Date.now() + 2 * 60 * 60_000 });
+  index.set(key, id);
   return '/api/netdisk/media?id=' + id;
 }
 export async function quarkMedia(req: Request, id: string) {
@@ -292,6 +332,7 @@ export async function quarkMedia(req: Request, id: string) {
   for (let i = 0; i < 4; i++) {
     const target = mediaHost(url); const verdict = await checkUpstreamAllowed(url);
     if (!verdict.ok) throw new PanError('播放地址不可用', 502);
+    if (ticket.kind !== 'hls' && new URL(req.url).searchParams.get('direct') === '1' && await canDeliverDirect(url)) return directMediaResponse(url);
     const headers = new Headers({ 'User-Agent': UA, Referer: 'https://pan.quark.cn/' });
     // Never forward account cookies to unrelated CDN tenants or arbitrary redirects.
     if (target.hostname === 'quark.cn' || target.hostname.endsWith('.quark.cn')) headers.set('Cookie', value.cookie);
@@ -308,7 +349,7 @@ export async function quarkMedia(req: Request, id: string) {
       for (;;) { const { done, value: part } = await reader.read(); if (done) break; length += part.length; if (length > 2_000_000) { await reader.cancel(); throw new PanError('播放清单过大', 502); } parts.push(part); }
       const text = Buffer.concat(parts).toString('utf8');
       if (!text.trimStart().startsWith('#EXTM3U')) throw new PanError('播放清单无效', 502);
-      const rewrite = (uri: string) => issueQuarkMedia(new URL(uri, url).href, value.id, /\.m3u8(?:[?#]|$)/i.test(uri) ? 'hls' : 'video');
+      const rewrite = (uri: string) => { const playlist = /\.m3u8(?:[?#]|$)/i.test(uri); const path = issueQuarkMedia(new URL(uri, url).href, value.id, playlist ? 'hls' : 'video'); return playlist ? path : preferDirectMedia(path); };
       const body = text.split('\n').map((line) => !line.trim() ? line : line.startsWith('#') ? line.replace(/URI="([^"]+)"/g, (_, uri: string) => `URI="${rewrite(uri)}"`) : rewrite(line.trim())).join('\n');
       return new Response(body, { headers: { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'private, no-store' } });
     }
