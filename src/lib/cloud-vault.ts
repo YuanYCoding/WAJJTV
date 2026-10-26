@@ -13,7 +13,7 @@ export interface CloudCredentials {
 
 /** Credentials never enter SQLite exports, localStorage, API responses or application logs. */
 export class CloudVault<T extends { id: string } = CloudCredentials> {
-  constructor(private directory: string, private secret: string, private filename: 'cloud-credentials.enc' | 'quark-credentials.enc' = 'cloud-credentials.enc') {}
+  constructor(private directory: string, private secret: string, private filename: 'cloud-credentials.enc' | 'quark-credentials.enc' | 'alipan-credentials.enc' = 'cloud-credentials.enc') {}
   private key() {
     const key = Buffer.from(this.secret, 'hex');
     if (key.length !== 32 || !/^[a-f\d]{64}$/i.test(this.secret)) throw new Error('Cloud encryption key is not configured');

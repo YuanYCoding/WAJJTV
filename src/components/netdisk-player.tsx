@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PanQuality } from '@/lib/netdisk-types';
 import { ViewingControls } from './viewing-controls';
 
-export function NetdiskPlayer({ quality, title, identity, saved, limited, onNext, onRefresh }: { quality: PanQuality; title: string; identity: string; saved: boolean; limited?: boolean; onNext?: (automatic?: boolean) => void; onRefresh: () => void }) {
+export function NetdiskPlayer({ quality, title, identity, saved, limited, provider = 'quark', notice, nextRequiresSave = true, onNext, onRefresh }: { quality: PanQuality; title: string; identity: string; saved: boolean; limited?: boolean; provider?: 'quark' | 'aliyun'; notice?: string; nextRequiresSave?: boolean; onNext?: (automatic?: boolean) => void; onRefresh: () => void }) {
   const box = useRef<HTMLDivElement>(null); const video = useRef<HTMLVideoElement>(null);
   const [resolution, setResolution] = useState(''); const [error, setError] = useState('');
   const [theater, setTheater] = useState(false); const [autoNext, setAutoNext] = useState(false);
@@ -35,14 +35,14 @@ export function NetdiskPlayer({ quality, title, identity, saved, limited, onNext
       <video ref={video} controls autoPlay playsInline preload="metadata" className="w-full h-full" onLoadedMetadata={() => {
         const el = video.current!; if (el.videoWidth) setResolution(`实测 ${el.videoWidth} × ${el.videoHeight}`);
         try { const p = Number(localStorage.getItem('jjbitv:pan-progress:' + identity)); if (p > 0 && p < el.duration - 5) el.currentTime = p; } catch { /* unavailable storage */ }
-      }} onResize={() => { const el = video.current!; if (el.videoWidth) setResolution(`实测 ${el.videoWidth} × ${el.videoHeight}`); }} onPause={save} onTimeUpdate={() => { if (video.current && Math.floor(video.current.currentTime) % 10 === 0) save(); }} onError={() => setError('当前浏览器无法播放此文件，可能是编码、网盘限速或播放地址失效。可以刷新地址，或用夸克 App 播放。')} onEnded={() => {
+      }} onResize={() => { const el = video.current!; if (el.videoWidth) setResolution(`实测 ${el.videoWidth} × ${el.videoHeight}`); }} onPause={save} onTimeUpdate={() => { if (video.current && Math.floor(video.current.currentTime) % 10 === 0) save(); }} onError={() => setError('当前浏览器无法播放此文件，可能是编码、网盘限速或播放地址失效。可以刷新地址、切换转码线路，或用官方网盘 App 播放。')} onEnded={() => {
         try { localStorage.removeItem('jjbitv:pan-progress:' + identity); } catch { /* optional */ }
         if (autoNext) onNext?.(true);
       }} />
     </div>
-    <div className="flex flex-wrap items-center gap-2 mt-3"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />自动连播（逐集转存，占用空间）</label></>}</div>
+    <div className="flex flex-wrap items-center gap-2 mt-3"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} />{nextRequiresSave ? '自动连播（逐集转存，占用空间）' : '自动连播'}</label></>}</div>
     <ViewingControls playerRef={box} theater={theater} onTheater={() => setTheater((v) => !v)} />
     {error && <p role="alert" className="text-warning text-sm mt-3">{error}</p>}
-    <p className="text-xs text-faint mt-3">{saved ? '已转存到「JjBiTV 追剧」，占用网盘空间；本站不会自动删除文件。' : limited ? '当前为免转存试看，不占用网盘空间。试看结束不会自动转存；完整观看可在夸克中查看或自行选择转存。' : '当前没有转存，不占用网盘空间。可播放时长以夸克实际提供为准。'}</p>
+    <p className="text-xs text-faint mt-3 leading-6">{notice || (saved ? '正在播放网盘中保存的文件；本站不会自动删除文件。' : limited ? '当前为免转存试看，不占用网盘空间。试看结束不会自动转存。' : `当前没有转存。可播放时长以${provider === 'aliyun' ? '阿里云盘' : '夸克'}实际提供为准。`)}</p>
   </section>;
 }

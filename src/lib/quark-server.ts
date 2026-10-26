@@ -205,7 +205,7 @@ async function saveShareFile(value: QuarkAccount, ref: FileRef, mapping: string)
   }
   throw new PanError('分享凭证仍未刷新，请重新打开目录', 409, 'SHARE_TOKEN_EXPIRED');
 }
-async function playback(value: QuarkAccount, ref: FileRef) {
+async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback> {
   const mapping = ref.share.id + ':' + ref.fid;
   let fid = value.saved[mapping];
   if (!fid) {
@@ -255,7 +255,9 @@ async function playback(value: QuarkAccount, ref: FileRef) {
     if (typeof url === 'string') qualities.push({ label: '原文件', url: issueQuarkMedia(url, value.id, 'video'), kind: 'video', width: ref.width, height: ref.height });
   }
   if (!qualities.length) throw new PanError('夸克暂未提供可用播放地址，可能受格式、转码状态或账号权益限制，请稍后重试或在夸克 App 查看', 409);
-  return { qualities, saved: true };
+  const payload = transcoded.status === 'fulfilled' ? transcoded.value as { meta?: { width?: number; height?: number; size?: number }; video_list?: Record<string, unknown>[] } : undefined;
+  const unavailable = (payload?.video_list || []).filter((v) => v.accessable === false).map((v) => ({ '4k': '4K', super: '超清', high: '高清' }[String(v.resolution)] || String(v.resolution)));
+  return { qualities, saved: true, original: { width: Number(payload?.meta?.width) || ref.width, height: Number(payload?.meta?.height) || ref.height, size: ref.size }, unavailable, notice: unavailable.length ? '原文件画质与网页可播画质不同。夸克未向当前网页连接开放部分高清线路，可在夸克 App 中查看。' : undefined };
 }
 export async function playQuarkFile(req: Request, key: string) {
   const ref = fileReference(req, key);

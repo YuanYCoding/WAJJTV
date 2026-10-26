@@ -12,6 +12,16 @@ export function parseQuarkShare(raw: string, passcode = '') {
   if (code && !/^[A-Za-z\d]{1,8}$/.test(code)) throw new PanError('提取码格式不正确');
   return { id, passcode: code, url: `https://pan.quark.cn/s/${id}` };
 }
+export function parsePanShare(raw: string, passcode = '') {
+  if (raw.length > 3000 || /[\r\n]/.test(passcode)) throw new PanError('分享链接或提取码格式不正确');
+  if (/https:\/\/pan\.quark\.cn\//.test(raw)) return { ...parseQuarkShare(raw, passcode), provider: 'quark' as const };
+  const match = raw.match(/https:\/\/(?:www\.)?(?:alipan|aliyundrive)\.com\/s\/[A-Za-z\d]{6,32}(?:\?[^\s<>"'，。]*)?/);
+  if (!match) throw new PanError('请输入有效的阿里云盘或夸克分享链接');
+  const url = new URL(match[0]); const id = url.pathname.split('/').pop()!;
+  const code = passcode.trim() || url.searchParams.get('pwd') || url.searchParams.get('password') || raw.match(/(?:提取码|提取碼|密码)\s*[:：]?\s*([A-Za-z\d]{4,8})/)?.[1] || '';
+  if (code && !/^[A-Za-z\d]{1,8}$/.test(code)) throw new PanError('提取码格式不正确');
+  return { id, passcode: code, url: `https://www.alipan.com/s/${id}`, provider: 'aliyun' as const };
+}
 export function plainText(raw: unknown, max = 300) {
   return String(raw ?? '').replace(/<[^>]*>/g, '').replace(/&(?:amp|quot|apos|lt|gt|nbsp);/g, (m) => ({ '&amp;': '&', '&quot;': '"', '&apos;': "'", '&lt;': '<', '&gt;': '>', '&nbsp;': ' ' }[m] || m)).replace(/\s+/g, ' ').trim().slice(0, max);
 }
@@ -24,7 +34,19 @@ export function qualityHint(text: string) {
 export function isRelevantPanTitle(title: string, keyword: string) {
   const normalize = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
   const a = normalize(title); const b = normalize(keyword);
-  return a.includes(b) && !/成人|色情|情色|成人视频|无码|番号|av合集|福利姬|里番|🔞/i.test(title);
+  let matches = a.includes(b);
+  if (/\d$/.test(b)) {
+    // Preserve punctuation before years: 战狼2.2017 matches, but 战狼.2015 is not 战狼2.
+    const pattern = [...b].map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[\\s._-]*');
+    matches = new RegExp(pattern + '(?!\\d)', 'i').test(title);
+  }
+  const sequel = keyword.match(/^(.*?)(\d+)$/);
+  if (!matches && sequel && normalize(sequel[1]).length > 1) {
+    const base = sequel[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const range = title.match(new RegExp(base + '\\s*(\\d+)\\s*[-~～至]\\s*(\\d+)'));
+    if (range) matches = Number(sequel[2]) >= Number(range[1]) && Number(sequel[2]) <= Number(range[2]);
+  }
+  return matches && !/成人|色情|情色|成人视频|无码|番号|av合集|福利姬|里番|🔞/i.test(title);
 }
 export function mergeCookies(previous: string, additions: string[]): string {
   const cookies = new Map<string, string>();
