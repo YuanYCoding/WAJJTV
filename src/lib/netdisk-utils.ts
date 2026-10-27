@@ -1,6 +1,10 @@
 export class PanError extends Error {
   constructor(message: string, public status = 400, public code = 'PAN_ERROR') { super(message); }
 }
+/** Video files, including common disc-stream formats; archives/images/subtitles are not video. */
+export function isVideoFile(name: string) {
+  return /\.(?:mp4|mkv|ts|m2ts|mts|mov|avi|m4v|webm|wmv|flv|rmvb|rm|mpg|mpeg|vob|3gp|3g2|f4v|m2v|mxf|ogv|asf|divx)$/i.test(name.trim());
+}
 export function parseQuarkShare(raw: string, passcode = '') {
   if (raw.length > 3000) throw new PanError('分享链接过长');
   if (/[\r\n]/.test(passcode)) throw new PanError('提取码格式不正确');

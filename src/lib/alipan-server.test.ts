@@ -58,7 +58,7 @@ describe('Aliyun official login and playback', () => {
     connect(); const paths: string[] = [];
     vi.stubGlobal('fetch', vi.fn(async (url: string) => { paths.push(url); if (url.includes('get_share_token')) return json({ share_token: 'share-secret' }); if (url.includes('/file/list')) return json({ items: [{ file_id: 'file1', name: '01.mkv', type: 'file', size: 1024, drive_id: 'source-drive' }] }); if (url.includes('video_preview')) return json({ video_preview_play_info: { live_transcoding_task_list: [{ status: 'finished', template_id: 'FHD', template_width: 1920, template_height: 1080, url: 'https://media.aliyundrive.net/a.m3u8' }] } }); if (url.includes('get_share_link_download')) return json({ download_url: 'https://media.aliyundrive.net/a.mkv' }); if (url.includes('a.m3u8')) return new Response('#EXTM3U\n#EXTINF:3600,\na.ts\n#EXT-X-ENDLIST', { headers: { 'Content-Type': 'application/vnd.apple.mpegurl' } }); throw new Error('Unexpected write'); }));
     const list = await listAliFiles(req(), 'https://www.alipan.com/s/abc12345678'); const value = await playAliFile(req(), list.items[0].key);
-    expect(value.saved).toBe(false); expect(value.qualities.map((q) => q.label)).toEqual(['1080P · 转码', '原文件']); expect(paths.some((p) => p.includes('batch') || p.includes('createWithFolders'))).toBe(false);
+    expect(value.saved).toBe(false); expect(value.qualities.map((q) => q.label)).toEqual(['1080P · 转码', '原画 · 原文件']); expect(paths.some((p) => p.includes('batch') || p.includes('createWithFolders'))).toBe(false);
   });
   it('serializes single-file transfers, persists mapping, and reuses it on repeated play', async () => {
     connect(); let copies = 0;

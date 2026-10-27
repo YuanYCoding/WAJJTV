@@ -2,6 +2,7 @@ import type { HlsConfig, Loader, LoaderContext, LoaderConfiguration, LoaderCallb
 import type { PanQuality } from './netdisk-types';
 export function chooseFullQuality(qualities: PanQuality[], height = 1080) {
   const full = qualities.filter((q) => !q.limited);
+  const original = full.find((q) => q.original); if (original) return original;
   const streams = full.filter((q) => q.kind === 'hls');
   return streams.filter((q) => (q.height || 0) <= height).sort((a, b) => (b.height || 0) - (a.height || 0))[0]
     || streams.sort((a, b) => (a.height || Infinity) - (b.height || Infinity))[0] || full[0];

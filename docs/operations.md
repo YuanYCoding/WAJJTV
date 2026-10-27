@@ -3,11 +3,11 @@
 ## 当前部署
 
 - 基线：LibreTV 2.16.12，原容器 `libretv`，`127.0.0.1:18080`。
-- 当前新版：一键播放、ArtPlayer 与容量清理 `2.19.7-jjbitv.8`，镜像 `jjbitv:v8-20261026`，容器 `jjbitv-v8`，`127.0.0.1:18091`。
-- 本次回滚目标：JjBiTV v7，镜像 `jjbitv:v7-20261026`，容器 `jjbitv-v7`，`127.0.0.1:18090`。更早 v6 / v5 / v4、WAJJTV v3 / v2 继续保留。
+- 当前新版：目录验证、准备状态流与原画备选 `2.19.7-jjbitv.9`，镜像 `jjbitv:v9-20261027`，容器 `jjbitv-v9`，`127.0.0.1:18092`。
+- 本次回滚目标：JjBiTV v8，镜像 `jjbitv:v8-20261026`，容器 `jjbitv-v8`，`127.0.0.1:18091`。更早 v7 / v6 / v5 / v4、WAJJTV v3 / v2 继续保留。
 - 更早 WAJJTV v1：容器 `wajjtv`，`127.0.0.1:18081`，继续保留。
 - 域名：`https://zhuiju.zhaxueit.cn/`，由 Nginx 转发；保留流式响应的 `proxy_buffering off`。
-- 新配置：`/opt/jjbitv-v8-20261026/.env`。沿用访问密码、`SITE_ORIGIN` 和独立的 `CLOUD_ENCRYPTION_KEY`；新增 `PAN_AUTO_CLEANUP=1`、`PAN_DIRECT_MEDIA=1`，不要提交私密配置到仓库。
+- 新配置：`/opt/jjbitv-v9-20261027/.env`。沿用访问密码、`SITE_ORIGIN`、独立的 `CLOUD_ENCRYPTION_KEY` 以及 `PAN_AUTO_CLEANUP=1`、`PAN_DIRECT_MEDIA=1`，不要提交私密配置到仓库。
 - 私人插画：`/opt/wajjtv-v2/private/mascots.png`，只读挂载到 `/app/private`，需登录访问 `/api/couple-art`。
 - 健康状态、旧片单数据库与夸克加密凭证：`/opt/jjbitv-20261024/data` 挂载到 `/app/data`，容器用户 UID/GID 1001 需要写权限。
 - 历史记录与偏好沿用原 IndexedDB / localStorage 名称，保留原有用户数据兼容性。
@@ -17,14 +17,14 @@
 在服务器执行：
 
 ```sh
-sh /opt/jjbitv-v8-20261026/rollback.sh
+sh /opt/jjbitv-v9-20261027/rollback.sh
 ```
 
-该脚本启动保留的 JjBiTV v7 容器，确认就绪后恢复 Nginx 至 18090，并停止 v8。现有数据目录、两种网盘凭证与清理授权保留。回滚应用不能恢复此前已经永久清理的云端文件。
+该脚本启动保留的 JjBiTV v8 容器，确认就绪后恢复 Nginx 至 18091，并停止 v9。现有数据目录、两种网盘凭证与清理授权保留。回滚应用不能恢复此前已经永久清理的云端文件；外部地址和准备状态包含内存票据，切换或重启后需要重新准备。
 
-本次备份：`/opt/backups/jjbitv-v7-before-playback-20261026-193153`，含运行镜像、源码、配置、SQLite 一致性快照、数据和素材。SHA256 与数据库完整性检查已通过；切换前另存 `precutover-*.sqlite` 与两个网盘凭证快照。原 v6 备份 `/opt/backups/jjbitv-v6-before-pan-expansion-20261026-163025`、v5 备份 `/opt/backups/jjbitv-v5-before-quark-fix-20261026-153934` 与 v4 备份 `/opt/backups/jjbitv-v4-before-quark-20261026-095148` 保留。
+本次备份：`/opt/backups/jjbitv-v8-before-discovery-20261027-095555`，含运行镜像、源码、配置、SQLite 一致性快照、数据和素材。SHA256 与数据库完整性检查已通过；切换前另存 `precutover-*.sqlite`、两个网盘凭证与清理授权快照。原 v7 备份 `/opt/backups/jjbitv-v7-before-playback-20261026-193153`、v6 备份 `/opt/backups/jjbitv-v6-before-pan-expansion-20261026-163025`、v5 / v4 备份继续保留。
 
-预发布在 18091 使用独立 `preview-data`；正式运行挂载既有 `/opt/jjbitv-20261024/data`。切换时只合并同一连接经过验证的较新凭证字段，保留生产转存映射和任务，不整体覆盖账号。网盘凭证分别位于 `quark-credentials.enc`、`alipan-credentials.enc`，清理授权和播放租约分别为 `netdisk-cleanup-policy.json`、`netdisk-leases.json`，需连同 `.env` 中 `CLOUD_ENCRYPTION_KEY` 备份，不能只复制数据库。日志只输出接口路径、HTTP 状态和业务码，不输出 Cookie、文件凭证或签名地址。
+预发布在 18092 使用独立 `preview-data`；正式运行挂载既有 `/opt/jjbitv-20261024/data`。切换时只合并同一连接经过验证的较新凭证字段，保留生产转存映射、任务与原有清理授权，不整体覆盖账号。网盘凭证分别位于 `quark-credentials.enc`、`alipan-credentials.enc`，清理授权和播放租约分别为 `netdisk-cleanup-policy.json`、`netdisk-leases.json`，需连同 `.env` 中 `CLOUD_ENCRYPTION_KEY` 备份，不能只复制数据库。日志只输出接口路径、HTTP 状态和业务码，不输出 Cookie、文件凭证或签名地址。
 
 保留的旧备份：`/opt/backups/wajjtv-v2-before-sources-20261023-191103`、`/opt/backups/wajjtv-v1-before-v2-20261021-194353`、`/opt/backups/wajjtv-before-20261021-171816`。备份含私密配置，不上传公共仓库。
 
@@ -65,6 +65,6 @@ npm run build
 
 私密文件从 `.gitignore` 和 `.dockerignore` 排除；公开源码保留 LibreTV 署名与 AGPL-3.0 许可证。
 
-## V8 验收
+## V9 验收
 
-49 个测试文件、565 项测试通过，TypeScript、ESLint 与 Linux Node 22 生产构建通过。真实约 81.46 GiB 文件验证完整转码、拖动/快捷键跳转与 CDN 分片；故障注入验证代理回退。两个网盘仅用本次创建的空目录验证删除契约，未删除原有影片来演练清理。参见 [V8 功能、证据与边界](netdisk-v8.md)。
+53 个测试文件、596 项测试通过，TypeScript、ESLint 与 Linux Node 22 生产构建通过。低配 Linux 构建使用单 worker，测试单项超时预算 20 秒，应用接口本身的超时保持独立。目录验证真实搜索、两种网盘准备弹窗、其他资源实际播放、标签零重搜、返回恢复结果/筛选/位置，以及手机布局均有浏览器验收。未为本轮验收删除原有影片或新增大文件转存。参见 [V9 功能、证据与边界](netdisk-v9.md)。

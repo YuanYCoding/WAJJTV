@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { diskQuota, ensureDiskSpace, startPlaybackLease, touchPlaybackLease, storageProtected, setAutoCleanup, type CleanupAdapter, type CleanupEntry } from './netdisk-storage';
+import { diskQuota, ensureDiskSpace, startPlaybackLease, touchPlaybackLease, reserveExternalLease, storageProtected, setAutoCleanup, type CleanupAdapter, type CleanupEntry } from './netdisk-storage';
 let dir: string;
 const request = (user = 'one') => new Request('https://cinema.test/api/netdisk/session', { headers: { Cookie: 'ltv_session=' + user } });
 const entry = (id: string, size: number, priority = 1): CleanupEntry => ({ id, size, priority, modified: 1 });
@@ -15,6 +15,8 @@ function adapter(items: CleanupEntry[], used = 90) {
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'jjbi-space-')); vi.stubEnv('LIBRARY_DATA_DIR', dir); vi.stubEnv('PAN_AUTO_CLEANUP', '1'); setAutoCleanup('aliyun', 'account', true); setAutoCleanup('quark', 'account', true); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); rmSync(dir, { recursive: true, force: true }); });
 describe('dedicated streaming account capacity cleanup', () => {
+  it('reserves an independent external playback lease so leaving the web player does not unprotect the file', () => { vi.useFakeTimers(); const own = startPlaybackLease(request(), 'aliyun', 'account', 'movie'); const external = reserveExternalLease(request(), own); touchPlaybackLease(request(), own, true); vi.advanceTimersByTime(4 * 60_000); expect(storageProtected('aliyun', 'account', 'movie')).toBe(true); expect(touchPlaybackLease(request('other'), external, true).active).toBe(false); touchPlaybackLease(request(), external, true); expect(storageProtected('aliyun', 'account', 'movie')).toBe(false); });
+  it('reports capacity and actual cleanup progress in order', async () => { const events: string[] = [], { api } = adapter([entry('old', 50)]); await ensureDiskSpace(30, api, (v) => events.push(v.stage)); expect(events).toEqual(['capacity', 'cleaning', 'cleaning']); });
   it('handles over-quota accounts and refuses unknown quota values', () => { expect(diskQuota(100, 120).free).toBe(0); expect(() => diskQuota(0, 0)).toThrow(); expect(() => diskQuota(100, NaN)).toThrow(); });
   it('does not enumerate or remove files when capacity is sufficient', async () => { const { api, remove } = adapter([], 10); await ensureDiskSpace(30, api); expect(api.candidates).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled(); });
   it('refuses a file larger than total capacity before deleting anything', async () => { const { api, remove } = adapter([entry('old', 90)]); await expect(ensureDiskSpace(101, api)).rejects.toMatchObject({ code: 'FILE_EXCEEDS_CAPACITY' }); expect(remove).not.toHaveBeenCalled(); expect(api.candidates).not.toHaveBeenCalled(); });

@@ -1,6 +1,7 @@
+import { discoverPanVideo } from './netdisk-discovery';
 import { createHash } from 'node:crypto';
 import { fetchUpstream } from './fetch-utils';
-import { isRelevantPanTitle, parseQuarkShare, parsePanShare, plainText, qualityHint } from './netdisk-utils';
+import { isRelevantPanTitle, parsePanShare, plainText, qualityHint } from './netdisk-utils';
 import { extraPanSources, extraPanSearch } from './netdisk-search-extra';
 import type { PanProvider, PanResult, PanSearchEvent } from './netdisk-types';
 
@@ -12,8 +13,6 @@ const SOURCES = [
 ] as const;
 const cache = new Map<string, { expires: number; list: PanResult[] }>();
 const health = new Map<string, { failures: number; nextCheck: number }>();
-const shareChecks = new Map<string, { valid: boolean; expires: number }>();
-let nextAliCheck = 0;
 export function panSources() { return SOURCES.map((s) => ({ id: s.id, name: s.name, status: ((health.get(s.id)?.nextCheck || 0) > Date.now() ? 'cooldown' : 'ready') as 'cooldown' | 'ready', nextCheck: health.get(s.id)?.nextCheck })); }
 export function extractQuarkLinks(text: string) {
   return extractPanLinks(text).filter((v) => v.provider === 'quark').map(({ url, passcode }) => ({ url, passcode }));
@@ -56,28 +55,7 @@ async function fromSource(source: typeof SOURCES[number], keyword: string, signa
     const batch: PanResult[] = [];
     for (const link of links) {
       if (pending.has(link.url)) continue; pending.add(link.url);
-      const cached = shareChecks.get(link.url + link.passcode);
-      if (cached && cached.expires > Date.now() && !cached.valid) continue;
-      let valid: boolean | undefined = cached?.expires && cached.expires > Date.now() ? cached.valid : undefined;
-      // Preflight must not overwhelm the provider or hold up search. Unchecked links are verified on open.
-      if (valid === undefined && (link.provider !== 'aliyun' || Date.now() >= nextAliCheck)) {
-        if (link.provider === 'aliyun') nextAliCheck = Date.now() + 350;
-        try {
-          const response = await fetch(link.provider === 'quark' ? 'https://drive-pc.quark.cn/1/clouddrive/share/sharepage/token?pr=ucpro&fr=pc&uc_param_str=' : 'https://api.alipan.com/v2/share_link/get_share_token', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', Referer: link.provider === 'quark' ? 'https://pan.quark.cn/' : 'https://www.alipan.com/', 'User-Agent': 'Mozilla/5.0' },
-            body: JSON.stringify(link.provider === 'quark' ? { pwd_id: parseQuarkShare(link.url).id, passcode: link.passcode } : { share_id: link.id, share_pwd: link.passcode }), redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(1800)]),
-          });
-          const value = await response.json();
-          if (link.provider === 'aliyun' && value.code === 'TooManyRequests') nextAliCheck = Date.now() + 30_000;
-          if (value.data?.stoken || value.share_token) valid = true;
-          else if ([41031, 41012, 41006, 41010].includes(Number(value.code)) || /ShareLink.*(Cancel|Forbid|NotFound|Expired)|ForbiddenFileInTheShareLink/.test(String(value.code))) valid = false;
-          if (valid !== undefined) {
-            if (shareChecks.size > 1000) shareChecks.delete(shareChecks.keys().next().value!);
-            shareChecks.set(link.url + link.passcode, { valid, expires: Date.now() + 5 * 60_000 });
-          }
-        } catch { /* Unknown availability remains explicitly unchecked. */ }
-      }
-      if (valid !== false && !signal.aborted) batch.push(result(source, title, link, valid === true));
+      if (!signal.aborted) batch.push(result(source, title, link, false));
     }
     const fresh = batch.filter((v) => !items.some((x) => x.id === v.id)); items.push(...fresh); if (fresh.length) emit(fresh);
   };
@@ -115,15 +93,26 @@ async function fromSource(source: typeof SOURCES[number], keyword: string, signa
 export async function searchNetdisk(keyword: string, selected: string[], emit: (event: PanSearchEvent) => void, external: AbortSignal, options: { page?: number; provider?: PanProvider } = {}) {
   const sources = SOURCES.filter((s) => selected.length === 0 || selected.includes(s.id));
   let total = 0; let failures = 0;
-  const seen = new Set<string>();
+  const seen = new Set<string>(); const checks: Promise<void>[] = []; let rejected = 0, unchecked = 0, checked = 0, verifying = 0;
+  const discoverySignal = AbortSignal.any([external, AbortSignal.timeout(45_000)]);
   await Promise.all(sources.map(async (source) => {
     const start = Date.now();
     const key = source.id + ':' + keyword + ':' + (options.page || 1) + ':' + (options.provider || 'all');
     const cached = cache.get(key);
+    const received: PanResult[] = [];
     const publish = (list: PanResult[]) => {
-      const fresh = list.filter((v) => { const key = v.shareUrl; if (seen.has(key)) return false; seen.add(key); return true; });
-      total += fresh.length;
-      if (fresh.length) emit({ type: 'results', source: source.id, list: fresh, ms: Date.now() - start });
+      received.push(...list);
+      for (const item of list) {
+        if (seen.has(item.shareUrl) || seen.size >= 100) continue; seen.add(item.shareUrl); verifying++;
+        checks.push((async () => {
+          const proof = await discoverPanVideo(item.shareUrl, item.passcode, discoverySignal);
+          verifying--; checked++;
+          if (external.aborted) return;
+          if (proof.status === 'video') { total++; emit({ type: 'results', source: source.id, list: [{ ...item, checked: true, videoSample: proof.sample }], ms: Date.now() - start }); }
+          else if (proof.status === 'empty') rejected++; else unchecked++;
+          emit({ type: 'checking', checked, rejected, pending: verifying });
+        })());
+      }
     };
     if (cached && cached.expires > Date.now()) { publish(cached.list); return; }
     if ((health.get(source.id)?.nextCheck || 0) > Date.now()) { failures++; emit({ type: 'results', source: source.id, list: [], ms: 0, error: '来源暂时失效，稍后自动复检' }); return; }
@@ -138,10 +127,15 @@ export async function searchNetdisk(keyword: string, selected: string[], emit: (
       if (!list.length) emit({ type: 'results', source: source.id, list: [], ms: Date.now() - start });
     } catch (e) {
       if (external.aborted) return;
+      if (received.length) {
+        health.delete(source.id); cache.set(key, { list: received, expires: Date.now() + 90_000 });
+        failures++; emit({ type: 'results', source: source.id, list: [], ms: Date.now() - start, error: '部分查询较慢，已保留先到候选' }); return;
+      }
       const previous = health.get(source.id); const count = (previous?.failures || 0) + 1;
       health.set(source.id, { failures: count, nextCheck: count >= 2 ? Date.now() + 5 * 60_000 : 0 });
       failures++; emit({ type: 'results', source: source.id, list: [], ms: Date.now() - start, error: e instanceof Error ? e.message : '来源暂不可用' });
     }
   }));
-  emit({ type: 'done', count: total, failures });
+  await Promise.all(checks);
+  if (!external.aborted) emit({ type: 'done', count: total, failures, rejected, unchecked, candidates: seen.size });
 }

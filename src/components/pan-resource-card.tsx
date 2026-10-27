@@ -9,10 +9,10 @@ export function PanIcon({ name, className }: { name: 'search' | 'close' | 'arrow
 }
 export function PanDriveIcon({ provider }: { provider: PanProvider }) { return <svg className={s.providerMark} width="25" height="25" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="8" stroke={provider === 'aliyun' ? '#7984f5' : '#6578e9'} strokeWidth="4" /><path d="m15.5 15.5 4 4" stroke={provider === 'aliyun' ? '#b9bffd' : '#abb8fc'} strokeWidth="3" strokeLinecap="round" /></svg>; }
 export function resourceDisplayTitle(title: string) { return title.split(/(?:简介|描述|资源描述|内容介绍|标签)\s*[:：]/)[0].replace(/\s+/g, ' ').trim().slice(0, 150) || title.slice(0, 150); }
-export const PanResourceCard = memo(function PanResourceCard({ row, href }: { row: PanResult; href: string }) {
+export const PanResourceCard = memo(function PanResourceCard({ row, href, onOpen }: { row: PanResult; href: string; onOpen?: () => void }) {
   const title = resourceDisplayTitle(row.title), knownQuality = row.qualityHint !== '画质待检测';
-  return <Link prefetch={false} href={href} className={s.card} aria-label={`打开 ${title}`} title={title}>
+  return <Link prefetch={false} href={href} onClick={onOpen} className={s.card} aria-label={`打开 ${title}`} title={title}>
     <div className={s.cardTop}><span className={s.providerName}><PanDriveIcon provider={row.provider || 'quark'} />{row.provider === 'aliyun' ? '阿里云盘' : '夸克'}</span>{knownQuality && <span className={s.qualityBadge} title="资源发布者标注，实际播放画质进入后确认">{row.qualityHint.replace('标注 ', '')}</span>}</div>
-    <h2 className={s.cardTitle}>{title}</h2><div className={s.cardBottom}><span className={s.sourceLine}><PanIcon name="source" /><span>{row.sourceName}</span><span className={row.checked ? s.validDot : s.pendingDot} /><span>{row.checked ? '分享可访问' : '打开时检测'}</span></span><span className={s.openCircle}><PanIcon name="arrow" /></span></div>
+    <h2 className={s.cardTitle}>{title}</h2><div className={s.cardBottom}><span className={s.sourceLine}><PanIcon name="source" /><span>{row.sourceName}</span><span className={row.checked ? s.validDot : s.pendingDot} /><span title={row.videoSample}>{row.videoSample ? '已发现视频' : row.checked ? '分享可访问' : '打开时检测'}</span></span><span className={s.openCircle}><PanIcon name="arrow" /></span></div>
   </Link>;
 });

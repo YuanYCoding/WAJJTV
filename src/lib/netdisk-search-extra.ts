@@ -1,4 +1,5 @@
-import { fetchUpstream } from './fetch-utils';
+import { panGet, panWorkers } from './pan-public-fetch';
+import { aipanCatalog } from './resource-catalog';
 import { plainText } from './netdisk-utils';
 import type { PanProvider } from './netdisk-types';
 export const extraPanSources = [
@@ -6,24 +7,34 @@ export const extraPanSources = [
   { id: 'melost', name: '影盘社', origin: 'https://www.melost.cn' },
   { id: 'erxiao', name: '花卷影视', origin: 'https://www.2xiaopan.one' },
   { id: 'dyyj', name: '电影云集', origin: 'https://bbs.dyyjmax.org' },
+  { id: 'wanou', name: '玩偶片库', origin: 'https://woog.nxog.eu.org' },
+  { id: 'aipan', name: '爱盼影视', origin: 'https://www.aipan.me' },
+  { id: 'pan365', name: '365 聚合', origin: 'https://pan.365wp.top' },
 ] as const;
 type Row = { title: string; content: string };
-export async function panGet(url: string, signal: AbortSignal, body?: object) {
-  const r = await fetchUpstream(url, { timeoutMs: 6000, signal, method: body ? 'POST' : 'GET', body: body ? JSON.stringify(body) : undefined, headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36', Referer: new URL(url).origin + '/' } });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  const reader = r.body!.getReader(), parts: Uint8Array[] = []; let size = 0;
-  for (;;) { const { done, value } = await reader.read(); if (done) break; size += value.length; if (size > 2_000_000) { await reader.cancel(); throw new Error('来源数据过大'); } parts.push(value); }
-  return Buffer.concat(parts).toString('utf8');
-}
 export function parseYunsoCards(html: string): Row[] {
   return [...html.matchAll(/<a\b([^>]*\burl="[^">]+"[^>]*)>([\s\S]*?)<\/a>/g)].map((m) => ({ title: plainText(m[2]), content: (m[1].match(/\burl="([^">]+)"/)?.[1] || '') + ' 提取码：' + (m[1].match(/\bpa="([^">]*)"/)?.[1] || '') }));
 }
-export async function panWorkers<T>(rows: T[], concurrency: number, signal: AbortSignal, action: (row: T) => Promise<void>) {
-  let cursor = 0; await Promise.all(Array.from({ length: Math.min(concurrency, rows.length) }, async () => { while (cursor < rows.length && !signal.aborted) await action(rows[cursor++]); }));
-}
 export async function extraPanSearch(id: string, keyword: string, page: number, provider: PanProvider | undefined, signal: AbortSignal, add: (title: string, content: string) => Promise<void>): Promise<boolean> {
   const source = extraPanSources.find((s) => s.id === id); if (!source) return false;
-  if (id === 'yunso') {
+  if (id === 'wanou') {
+    const data = JSON.parse(await panGet(source.origin + '/api.php/provide/vod?' + new URLSearchParams({ ac: 'detail', wd: keyword, pg: String(page) }), signal));
+    if (!Array.isArray(data.list)) throw new Error('玩偶片库响应异常');
+    await panWorkers(data.list as Record<string, unknown>[], 3, signal, (v) => add(plainText(v.vod_name), String(v.vod_down_url || '') + ' ' + String(v.vod_play_url || '')));
+  } else if (id === 'aipan') {
+    for (const movie of await aipanCatalog(keyword, page, signal)) for (const link of movie.links) await add(movie.title + ' ' + link.name, link.url);
+  } else if (id === 'pan365') {
+    await Promise.all((provider ? [provider] : ['aliyun', 'quark']).map(async (kind) => {
+      const data = JSON.parse(await panGet(source.origin + '/api/interface/search?' + new URLSearchParams({ keyword, disk_type: kind, page: String(page), pageSize: '20' }), signal));
+      if (!Array.isArray(data.data?.list)) throw new Error('365 聚合响应异常');
+      await panWorkers((data.data.list as Record<string, unknown>[]).filter((v) => v.disk_type === kind).slice(0, 12), 3, signal, async (row) => {
+        try { let url = String(row.url || ''), code = ''; if (!/^https:\/\/(?:pan\.quark\.cn|(?:www\.)?(?:alipan|aliyundrive)\.com)\/s\//.test(url)) {
+          const resolved = JSON.parse(await panGet(source.origin + '/api/transfer-share/transfer-share', signal, { encrypted_url: url }));
+          url = String(resolved.data?.share_url || resolved.data?.original_url || ''); code = String(resolved.data?.passcode || '');
+        } await add(plainText(row.title), url + (code ? ' 提取码：' + code : '')); } catch { /* Keep independent successfully resolved shares. */ }
+      });
+    }));
+  } else if (id === 'yunso') {
     const providers = provider ? [provider] : ['quark', 'aliyun'] as const;
     await Promise.all(providers.map(async (p) => {
       const query = new URLSearchParams({ requestID: '', mode: '90002', scope_content: '0', stype: '', wd: keyword + (p === 'aliyun' ? ' 阿里' : ''), uk: '', page: String(page), limit: '30', screen_filetype: '' });

@@ -2,11 +2,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { secp256k1 } from '@noble/curves/secp256k1';
 import QRCode from 'qrcode';
 import { CloudVault } from './cloud-vault';
-import { PanError, idValue, parsePanShare, plainText } from './netdisk-utils';
+import { PanError, isVideoFile, idValue, parsePanShare, plainText } from './netdisk-utils';
 import { checkUpstreamAllowed } from './ssrf';
 import { autoCleanupEnabled, diskQuota, ensureDiskSpace, startPlaybackLease, storageProtected, clearAccountLeases, setAutoCleanup, type CleanupAdapter, type CleanupEntry } from './netdisk-storage';
 import { canDeliverDirect, directMediaResponse, preferDirectMedia } from './netdisk-delivery';
-import type { PanFile, PanListing, PanPlayback, PanQuality } from './netdisk-types';
+import type { PanFile, PanListing, PanPlayback, PanQuality, PanProgressFn } from './netdisk-types';
 
 interface AliAccount { id: string; accessToken: string; refreshToken: string; expires: number; name: string; userId: string; drive: string; folder?: string; saved: Record<string, string>; tasks: Record<string, string>; device?: { id: string; key: string; signature: string } }
 interface AliLogin { t: string; ck: string; owner: string; expires: number; polling?: Promise<{ connected: boolean; expired?: boolean }> }
@@ -127,7 +127,7 @@ export async function listAliFiles(req: Request, raw: string, passcode = '', par
   if (registry.files.size > 5000) throw new PanError('打开目录较多，请稍后重试', 429);
   const items: PanFile[] = [];
   for (const file of rows) {
-    const name = plainText(file.name, 300), folder = file.type === 'folder'; if (!folder && !/\.(mp4|mkv|ts|mov|avi|m4v|webm)$/i.test(name)) continue;
+    const name = plainText(file.name, 300), folder = file.type === 'folder'; if (!folder && !isVideoFile(name)) continue;
     const ref: AliFile = { fid: idValue(file.file_id), name, folder, size: Number(file.size) || 0, owner: owner(req), expires: Date.now() + 8 * 60 * 60_000, share, account: a?.id, drive: text(file.drive_id) || a?.drive, ancestors };
     const metadata = file.video_media_metadata as { width?: number; height?: number } | undefined; ref.width = Number(metadata?.width) || undefined; ref.height = Number(metadata?.height) || undefined;
     const key = randomUUID(); registry.files.set(key, ref); items.push({ key, identity: createHash('sha256').update('aliyun:' + (share?.id || a!.id) + ':' + ref.fid).digest('hex').slice(0, 32), name, folder, size: ref.size, width: ref.width, height: ref.height });
@@ -169,11 +169,12 @@ export async function aliStorageAdapter(value?: AliAccount): Promise<CleanupAdap
     },
   };
 }
-async function ensureSaved(a: AliAccount, ref: AliFile) {
+async function ensureSaved(a: AliAccount, ref: AliFile, progress?: PanProgressFn) {
   if (!ref.share) { if (ref.account !== a.id) throw new PanError('网盘账号已更改', 409); return { fid: ref.fid, cleaned: 0 }; }
   const mapping = ref.share.id + ':' + ref.fid; if (a.saved[mapping]) return { fid: a.saved[mapping], cleaned: 0 };
   if (a.tasks[mapping]) throw new PanError('上次转存结果尚未确认，请先在阿里云盘查看「JjBiTV 追剧」，避免重复转存', 409, 'TRANSFER_UNCERTAIN');
-  const space = await ensureDiskSpace(ref.size, { ...await aliStorageAdapter(a), protectedIds: [ref.fid, ...(ref.ancestors || [])] });
+  const space = await ensureDiskSpace(ref.size, { ...await aliStorageAdapter(a), protectedIds: [ref.fid, ...(ref.ancestors || [])] }, progress);
+  progress?.({ stage: 'saving', message: '空间已就绪，正在转存选中的视频' });
   if (!a.folder) {
     const folders = await api('/v2/file/list', { drive_id: a.drive, parent_file_id: 'root', limit: 100, order_by: 'name', order_direction: 'ASC' }, a);
     const existing = (folders.items as Record<string, unknown>[] | undefined)?.find((v) => v.type === 'folder' && v.name === 'JjBiTV 追剧');
@@ -189,14 +190,16 @@ async function ensureSaved(a: AliAccount, ref: AliFile) {
     const fid = idValue(result!.file_id); a.saved[mapping] = fid; delete a.tasks[mapping]; persist(a); return { fid, cleaned: space.deleted };
   } catch (e) { if (e instanceof AliReject) { delete a.tasks[mapping]; persist(a); } throw e; }
 }
-async function playback(a: AliAccount, ref: AliFile, save: boolean): Promise<PanPlayback> {
+async function playback(a: AliAccount, ref: AliFile, save: boolean, progress?: PanProgressFn): Promise<PanPlayback> {
   if (ref.folder) throw new PanError('请选择视频文件');
-  const saved = save ? await ensureSaved(a, ref) : { fid: ref.fid, cleaned: 0 }; const fid = saved.fid;
+  const saved = save ? await ensureSaved(a, ref, progress) : { fid: ref.fid, cleaned: 0 }; const fid = saved.fid;
   const token = !save && ref.share ? await shareAccess(ref.share) : '';
   const body = !save && ref.share ? { share_id: ref.share.id, file_id: fid, drive_id: ref.drive } : { drive_id: a.drive, file_id: fid };
-  const [preview] = await Promise.allSettled([api(!save && ref.share ? '/v2/file/get_share_link_video_preview_play_info' : '/v2/file/get_video_preview_play_info', { ...body, category: 'live_transcoding', url_expire_sec: 14400, get_preview_url: true, template_id: '' }, a, token)]);
-  const fullStream = preview.status === 'fulfilled' && ((preview.value.video_preview_play_info as { live_transcoding_task_list?: Record<string, unknown>[] } | undefined)?.live_transcoding_task_list || []).some((v) => v.status === 'finished' && text(v.url).startsWith('https://'));
-  const original = save && fullStream ? { status: 'fulfilled' as const, value: {} } : (await Promise.allSettled([api(!save && ref.share ? '/v2/file/get_share_link_download_url' : '/v2/file/get_download_url', { ...body, expire_sec: 14400 }, a, token)]))[0];
+  progress?.({ stage: 'resolving', message: '正在获取原文件地址和完整转码画质' });
+  const [preview, original] = await Promise.allSettled([
+    api(!save && ref.share ? '/v2/file/get_share_link_video_preview_play_info' : '/v2/file/get_video_preview_play_info', { ...body, category: 'live_transcoding', url_expire_sec: 14400, get_preview_url: true, template_id: '' }, a, token),
+    api(!save && ref.share ? '/v2/file/get_share_link_download_url' : '/v2/file/get_download_url', { ...body, expire_sec: 14400 }, a, token),
+  ]);
   const qualities: PanQuality[] = []; let sourceDuration: number | undefined;
   if (preview.status === 'fulfilled') {
     const info = preview.value.video_preview_play_info as { live_transcoding_task_list?: Record<string, unknown>[]; meta?: { duration?: number } } | undefined;
@@ -208,7 +211,7 @@ async function playback(a: AliAccount, ref: AliFile, save: boolean): Promise<Pan
     }
     qualities.sort((x, y) => (y.height || 0) - (x.height || 0));
   }
-  if (original.status === 'fulfilled') { const url = text(original.value.url) || text(original.value.download_url); if (url.startsWith('https://')) qualities.push({ label: '原文件', url: issueAliMedia(url, a.id), kind: 'video', width: ref.width, height: ref.height }); }
+  if (original.status === 'fulfilled') { const url = text(original.value.url) || text(original.value.download_url); if (url.startsWith('https://')) qualities.push({ label: '原画 · 原文件', url: issueAliMedia(url, a.id) + '&direct=1&original=1', kind: 'video', original: true, container: ref.name.split('.').pop()?.toLowerCase(), width: ref.width, height: ref.height }); }
   if (!qualities.length) throw new PanError('阿里云盘暂未返回可播放地址，可尝试转存后播放或在官方客户端查看', 409, 'PLAYBACK_UNAVAILABLE');
   if (currentAccount().id !== a.id) throw new PanError('网盘连接已更改', 409);
   await Promise.all(qualities.filter((q) => q.kind === 'hls').map(async (q) => {
@@ -226,10 +229,11 @@ async function playback(a: AliAccount, ref: AliFile, save: boolean): Promise<Pan
   if (save && !qualities.some((q) => !q.limited)) throw new PanError('文件已转存，但阿里云盘没有提供完整播放线路，请换一个资源或在官方 App 查看', 409, 'FULL_PLAYBACK_UNAVAILABLE');
   return { qualities: save ? qualities.filter((q) => !q.limited) : qualities, saved: save || !ref.share, duration, sourceDuration, limited, cleaned: saved.cleaned, original: { width: ref.width, height: ref.height, size: ref.size }, notice: limited ? '阿里云盘当前只提供限时预览。页面显示的是实际播放清单时长，不代表可以完整播放。' : undefined };
 }
-export async function playAliFile(req: Request, key: string, save = false) {
+export async function playAliFile(req: Request, key: string, save = false, progress?: PanProgressFn) {
   const ref = reference(req, key); const a = await account();
   if (!save) return playback(a, ref, false);
-  const previous = registry.locks.get(a.id); const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(async () => { const latest = await account(); if (latest.id !== a.id) throw new PanError('网盘连接已更改', 409); const result = await playback(latest, ref, true); const fid = ref.share ? latest.saved[ref.share.id + ':' + ref.fid] : ref.fid; return { ...result, lease: startPlaybackLease(req, 'aliyun', latest.id, fid, ref.share ? [latest.folder || ''] : ref.ancestors) }; });
+  progress?.({ stage: 'queued', message: '已加入播放准备队列，正在连接阿里云盘' });
+  const previous = registry.locks.get(a.id); const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(async () => { const latest = await account(); if (latest.id !== a.id) throw new PanError('网盘连接已更改', 409); const result = await playback(latest, ref, true, progress); const fid = ref.share ? latest.saved[ref.share.id + ':' + ref.fid] : ref.fid; return { ...result, lease: startPlaybackLease(req, 'aliyun', latest.id, fid, ref.share ? [latest.folder || ''] : ref.ancestors) }; });
   registry.locks.set(a.id, task); try { return await task; } finally { if (registry.locks.get(a.id) === task) registry.locks.delete(a.id); }
 }
 function mediaUrl(raw: string) { const u = new URL(raw); if (u.protocol !== 'https:' || u.username || u.password || !['aliyundrive.net', 'aliyundrive.com', 'alipan.com', 'aliyuncs.com'].some((h) => u.hostname === h || u.hostname.endsWith('.' + h))) throw new PanError('阿里云盘播放地址不受支持', 502); return u; }
@@ -241,12 +245,13 @@ export function issueAliMedia(url: string, account: string, playlist = false) {
   if (registry.media.size > 12_000) throw new PanError('播放请求较多，请稍后重试', 429);
   const id = randomUUID(); registry.media.set(id, { url, account, playlist, expires: now + 3 * 60 * 60_000 }); index.set(key, id); return '/api/alipan/media?id=' + id;
 }
+export function extendAliMedia(id: string) { const ticket = registry.media.get(id); if (!ticket || ticket.account !== currentAccount().id || ticket.expires < Date.now()) throw new PanError('播放地址已过期，请重新准备', 410); ticket.expires = Date.now() + 4 * 60 * 60_000; }
 export async function aliMedia(req: Request, id: string) {
   const ticket = registry.media.get(id); if (!ticket || ticket.account !== currentAccount().id || ticket.expires < Date.now()) throw new PanError('播放地址已过期，请刷新', 410);
   let url = ticket.url;
   for (let i = 0; i < 4; i++) {
     mediaUrl(url); if (!(await checkUpstreamAllowed(url)).ok) throw new PanError('播放地址不可用', 502);
-    if (!ticket.playlist && !/\.m3u8(?:[?#]|$)/i.test(url) && new URL(req.url).searchParams.get('direct') === '1' && await canDeliverDirect(url)) return directMediaResponse(url);
+    if (!ticket.playlist && !/\.m3u8(?:[?#]|$)/i.test(url) && new URL(req.url).searchParams.get('direct') === '1' && await canDeliverDirect(url, new URL(req.url).searchParams.get('original') !== '1')) return directMediaResponse(url);
     const headers = new Headers({ 'User-Agent': UA, Referer: 'https://www.alipan.com/' }); const range = req.headers.get('range'); if (range && /^bytes=\d*-\d*$/.test(range)) headers.set('Range', range);
     const connection = new AbortController(); const timeout = setTimeout(() => connection.abort(), 20_000); let res: Response;
     try { res = await fetch(url, { headers, redirect: 'manual', signal: AbortSignal.any([req.signal, connection.signal]), cache: 'no-store' }); } finally { clearTimeout(timeout); }

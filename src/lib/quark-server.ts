@@ -1,11 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 import { CloudVault } from './cloud-vault';
-import { PanError, idValue, mergeCookies, parseQuarkShare, plainText } from './netdisk-utils';
+import { PanError, isVideoFile, idValue, mergeCookies, parseQuarkShare, plainText } from './netdisk-utils';
 import { checkUpstreamAllowed } from './ssrf';
 import { autoCleanupEnabled, diskQuota, ensureDiskSpace, startPlaybackLease, storageProtected, clearAccountLeases, setAutoCleanup, type CleanupAdapter, type CleanupEntry } from './netdisk-storage';
 import { canDeliverDirect, directMediaResponse, preferDirectMedia } from './netdisk-delivery';
-import type { PanFile, PanListing, PanQuality, PanPlayback } from './netdisk-types';
+import type { PanFile, PanListing, PanQuality, PanPlayback, PanProgressFn } from './netdisk-types';
 
 interface QuarkAccount { id: string; cookie: string; name: string; folder?: string; saved: Record<string, string>; tasks?: Record<string, string> }
 interface Login { token: string; owner: string; expires: number; polling?: Promise<{ connected: boolean; expired?: boolean }> }
@@ -138,7 +138,7 @@ export async function listQuarkShare(req: Request, raw: string, passcode = '', p
   for (const file of list) {
     const folder = file.file_type === 0 || file.dir === true;
     const name = plainText(file.file_name, 300);
-    if (!folder && !/\.(mp4|mkv|ts|mov|avi|m4v|webm)$/i.test(name)) continue;
+    if (!folder && !isVideoFile(name)) continue;
     const key = randomUUID(); const video = file.video_info as Record<string, unknown> | undefined;
     const ref: FileRef = { fid: idValue(file.fid), token: String(file.share_fid_token || ''), name, folder, size: Number(file.size) || 0, share, parent, page, owner: owner(req), ancestors, expires: Date.now() + 8 * 60 * 60_000, width: Number(video?.width) || undefined, height: Number(video?.height) || undefined };
     const identity = createHash('sha256').update(share.id + ':' + ref.fid).digest('hex').slice(0, 32);
@@ -240,12 +240,13 @@ export function quarkStorageAdapter(value = account()): CleanupAdapter {
   };
 }
 const textRecord = (v: unknown) => typeof v === 'string' ? v : typeof v === 'number' ? String(v) : undefined;
-async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback> {
+async function playback(value: QuarkAccount, ref: FileRef, progress?: PanProgressFn): Promise<PanPlayback> {
   const mapping = ref.share.id + ':' + ref.fid;
   let fid = value.saved[mapping]; let cleaned = 0;
   if (!fid) {
     if (value.tasks?.[mapping] === 'uncertain') throw new PanError('上次转存结果暂未确认，请先在夸克查看「JjBiTV 追剧」目录，避免重复占用空间', 409, 'TRANSFER_UNCERTAIN');
-    if (!value.tasks?.[mapping]) cleaned = (await ensureDiskSpace(ref.size, { ...quarkStorageAdapter(value), protectedIds: [ref.fid, ...(ref.ancestors || [])] })).deleted;
+    if (!value.tasks?.[mapping]) cleaned = (await ensureDiskSpace(ref.size, { ...quarkStorageAdapter(value), protectedIds: [ref.fid, ...(ref.ancestors || [])] }, progress)).deleted;
+    progress?.({ stage: 'saving', message: '空间已就绪，正在转存选中的视频' });
     if (!value.folder) {
       const folders = await drive('file/sort', value, undefined, { pdir_fid: '0', _page: '1', _size: '100', _sort: 'file_type:asc,file_name:asc' }) as { list?: Record<string, unknown>[] };
       const existing = folders.list?.find((f) => f.file_name === 'JjBiTV 追剧' && f.file_type === 0);
@@ -269,9 +270,11 @@ async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback>
     }
     if (!fid) throw new PanError('夸克仍在转存，再次点击会继续检查，不会重复转存', 409, 'TRANSFER_PENDING');
   }
-  const [transcoded] = await Promise.allSettled([drive('file/v2/play', value, { fid, resolutions: 'normal,low,high,super,2k,4k', supports: 'fmp4,m3u8' })]);
-  const hasStream = transcoded.status === 'fulfilled' && ((transcoded.value as { video_list?: Record<string, unknown>[] }).video_list || []).some((v) => v.accessable !== false && typeof (v.video_info as Record<string, unknown> | undefined)?.url === 'string');
-  const original = hasStream ? { status: 'fulfilled' as const, value: [] } : (await Promise.allSettled([drive('file/download', value, { fids: [fid] })]))[0];
+  progress?.({ stage: 'resolving', message: '正在获取原文件地址和完整转码画质' });
+  const [transcoded, original] = await Promise.allSettled([
+    drive('file/v2/play', value, { fid, resolutions: 'normal,low,high,super,2k,4k', supports: 'fmp4,m3u8' }),
+    drive('file/download', value, { fids: [fid] }),
+  ]);
   const qualities: PanQuality[] = [];
   if (transcoded.status === 'fulfilled') {
     const data = transcoded.value as { video_list?: Record<string, unknown>[] };
@@ -289,22 +292,23 @@ async function playback(value: QuarkAccount, ref: FileRef): Promise<PanPlayback>
   }
   if (original.status === 'fulfilled') {
     const download = original.value as Record<string, unknown>[]; const url = download?.[0]?.download_url;
-    if (typeof url === 'string') qualities.push({ label: '原文件', url: issueQuarkMedia(url, value.id, 'video'), kind: 'video', width: ref.width, height: ref.height });
+    if (typeof url === 'string') qualities.push({ label: '原画 · 原文件', url: issueQuarkMedia(url, value.id, 'video') + '&direct=1&original=1', kind: 'video', original: true, container: ref.name.split('.').pop()?.toLowerCase(), width: ref.width, height: ref.height });
   }
   if (!qualities.length) throw new PanError('夸克暂未提供可用播放地址，可能受格式、转码状态或账号权益限制，请稍后重试或在夸克 App 查看', 409);
   const payload = transcoded.status === 'fulfilled' ? transcoded.value as { meta?: { width?: number; height?: number; size?: number }; video_list?: Record<string, unknown>[] } : undefined;
   const unavailable = (payload?.video_list || []).filter((v) => v.accessable === false).map((v) => ({ '4k': '4K', super: '超清', high: '高清' }[String(v.resolution)] || String(v.resolution)));
   return { qualities, saved: true, cleaned, original: { width: Number(payload?.meta?.width) || ref.width, height: Number(payload?.meta?.height) || ref.height, size: ref.size }, unavailable, notice: unavailable.length ? '原文件画质与网页可播画质不同。夸克未向当前网页连接开放部分高清线路，可在夸克 App 中查看。' : undefined };
 }
-export async function playQuarkFile(req: Request, key: string) {
+export async function playQuarkFile(req: Request, key: string, progress?: PanProgressFn) {
   const ref = fileReference(req, key);
   const value = account(); const lock = value.id;
   // Serialize cloud mutations across tabs so folder creation and save mappings cannot overwrite each other.
+  progress?.({ stage: 'queued', message: '已加入播放准备队列，正在连接夸克' });
   const previous = registry.playback.get(lock);
   const task = (previous ? previous.catch(() => {}) : Promise.resolve()).then(async () => {
     const current = account();
     if (current.id !== value.id) throw new PanError('夸克连接已更改，请刷新后重试', 409);
-    const result = await playback(current, ref); return { ...result, lease: startPlaybackLease(req, 'quark', current.id, current.saved[ref.share.id + ':' + ref.fid], [current.folder || '']) };
+    const result = await playback(current, ref, progress); return { ...result, lease: startPlaybackLease(req, 'quark', current.id, current.saved[ref.share.id + ':' + ref.fid], [current.folder || '']) };
   });
   registry.playback.set(lock, task);
   try { return await task; } finally { if (registry.playback.get(lock) === task) registry.playback.delete(lock); }
@@ -325,6 +329,7 @@ export function issueQuarkMedia(url: string, accountId: string, kind: 'hls' | 'v
   index.set(key, id);
   return '/api/netdisk/media?id=' + id;
 }
+export function extendQuarkMedia(id: string) { const ticket = registry.media.get(id); if (!ticket || ticket.account !== account().id || ticket.expires < Date.now()) throw new PanError('播放地址已过期，请重新准备', 410); ticket.expires = Date.now() + 4 * 60 * 60_000; }
 export async function quarkMedia(req: Request, id: string) {
   const ticket = registry.media.get(id); const value = account();
   if (!ticket || ticket.account !== value.id || ticket.expires < Date.now()) throw new PanError('播放链接已过期，请重新点击播放', 410);
@@ -332,7 +337,7 @@ export async function quarkMedia(req: Request, id: string) {
   for (let i = 0; i < 4; i++) {
     const target = mediaHost(url); const verdict = await checkUpstreamAllowed(url);
     if (!verdict.ok) throw new PanError('播放地址不可用', 502);
-    if (ticket.kind !== 'hls' && new URL(req.url).searchParams.get('direct') === '1' && await canDeliverDirect(url)) return directMediaResponse(url);
+    if (ticket.kind !== 'hls' && new URL(req.url).searchParams.get('direct') === '1' && await canDeliverDirect(url, new URL(req.url).searchParams.get('original') !== '1')) return directMediaResponse(url);
     const headers = new Headers({ 'User-Agent': UA, Referer: 'https://pan.quark.cn/' });
     // Never forward account cookies to unrelated CDN tenants or arbitrary redirects.
     if (target.hostname === 'quark.cn' || target.hostname.endsWith('.quark.cn')) headers.set('Cookie', value.cookie);

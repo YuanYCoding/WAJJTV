@@ -69,7 +69,7 @@ export function NetdiskPlayer(props: Props) {
       art.on('video:timeupdate', () => { if (disposed) return; if (art) position.current = { identity, time: art.currentTime }; if (Date.now() - lastSave > 5000) { save(); lastSave = Date.now(); } });
       art.on('video:pause', save);
       art.on('video:ended', () => { position.current.time = 0; try { localStorage.removeItem('jjbitv:pan-progress:' + identity); } catch { /* optional */ } if (autoNextRef.current) latest.current.onNext?.(true); });
-      art.on('video:error', () => { if (!disposed) { setError('视频加载异常，请切换转码线路或刷新播放地址'); recover(); } });
+      art.on('video:error', () => { if (!disposed) { setError(quality.original ? '浏览器可能不支持原文件的容器或编码。可在下方使用外部播放器，或选择上方的完整转码线路。' : '视频加载异常，请切换转码线路或刷新播放地址'); recover(); } });
       art.video.addEventListener('resize', report); removeResize = () => art?.video.removeEventListener('resize', report);
       const keyboard = (e: KeyboardEvent) => {
         if (!art || e.altKey || e.ctrlKey || e.metaKey || (e.target as HTMLElement)?.closest('input,textarea,select,[contenteditable="true"],[role="dialog"]')) return;
@@ -80,11 +80,11 @@ export function NetdiskPlayer(props: Props) {
       monitor = setInterval(() => { if (!art || art.video.paused || art.video.ended) { stuckSince = 0; return; } if (Math.abs(art.currentTime - lastTime) > .1 && !art.video.seeking) { lastTime = art.currentTime; stuckSince = 0; } else { stuckSince ||= Date.now(); if (Date.now() - stuckSince > 10_000) recover(); } }, 2000);
     }).catch(() => { if (!disposed) setError('播放器加载失败，请刷新页面'); });
     return () => { save(); disposed = true; clearInterval(monitor); removeKeys(); removeResize(); hls?.destroy(); art?.destroy(false); host?.replaceChildren(); if (player.current === art) player.current = null; };
-  }, [quality.url, quality.kind, identity]);
+  }, [quality.url, quality.kind, quality.original, identity]);
   return <section className={theater ? 'fixed inset-0 z-50 bg-black p-3 sm:p-6 flex flex-col justify-center' : 'mt-4'}>
     <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-medium truncate">{title}</h2><span className="text-xs text-accent shrink-0">{resolution || '正在读取实际画质'}</span></div>
     <div ref={box} className="relative aspect-video max-h-[78vh] bg-black rounded-xl overflow-hidden"><div ref={container} data-testid="pan-artplayer" className="h-full w-full" />{status && <div role="status" className="absolute top-3 left-3 pointer-events-none rounded bg-black/60 px-3 py-1.5 text-xs text-white">{status}</div>}</div>
-    <div className="flex flex-wrap items-center gap-3 mt-4"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => { setAutoNext(e.target.checked); try { localStorage.setItem('jjbitv:pan-autonext', String(e.target.checked)); } catch { /* optional */ } }} />自动连播</label></>}<span className="text-[11px] text-faint">← → 跳转10秒 · Shift 加速跳转 · 空格暂停</span></div>
+    <div className="flex flex-wrap items-center gap-3 mt-4"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => { setAutoNext(e.target.checked); try { localStorage.setItem('jjbitv:pan-autonext', String(e.target.checked)); } catch { /* optional */ } }} />自动准备下一集</label></>}<span className="text-[11px] text-faint">← → 跳转10秒 · Shift 加速跳转 · 空格暂停</span></div>
     <ViewingControls playerRef={box} theater={theater} onTheater={() => setTheater((v) => !v)} />
     {error && <p role="alert" className="text-warning text-sm mt-3">{error}</p>}
     {props.notice && <p className="text-xs text-faint mt-3 leading-6">{props.notice}</p>}

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { PanError } from './netdisk-utils';
-import type { PanProvider } from './netdisk-types';
+import type { PanProvider, PanProgressFn } from './netdisk-types';
 export interface DiskQuota { total: number; used: number; free: number }
 export interface CleanupEntry { id: string; parent?: string; size: number; modified: number; priority: number; recycle?: boolean; record?: string; drive?: string }
 interface Lease { id: string; owner: string; provider: PanProvider; account: string; hashes: string[]; expires: number }
@@ -42,6 +42,11 @@ export function touchPlaybackLease(req: Request, id: string, release = false) {
   if (release) writeLeases(rows.filter((v) => v !== lease)); else { lease.expires = Date.now() + 180_000; writeLeases(rows); }
   return { active: !release };
 }
+export function reserveExternalLease(req: Request, id: string) {
+  const rows = readLeases(), lease = rows.find((v) => v.id === id && v.owner === owner(req));
+  if (!lease) throw new PanError('播放准备已过期，请重新点播放', 410);
+  const copy = { ...lease, id: randomUUID(), expires: Date.now() + 6 * 60 * 60_000 }; rows.push(copy); writeLeases(rows); return copy.id;
+}
 export function storageProtected(provider: PanProvider, account: string, file: string) {
   const key = hash(account, file); return readLeases().some((v) => v.provider === provider && v.account === account && v.hashes.includes(key));
 }
@@ -53,17 +58,20 @@ export interface CleanupAdapter {
   candidates: () => Promise<CleanupEntry[]>;
   remove: (entry: CleanupEntry) => Promise<void>;
 }
-export async function ensureDiskSpace(required: number, adapter: CleanupAdapter): Promise<{ deleted: number; quota: DiskQuota }> {
+export async function ensureDiskSpace(required: number, adapter: CleanupAdapter, progress?: PanProgressFn): Promise<{ deleted: number; quota: DiskQuota }> {
+  progress?.({ stage: 'capacity', message: '正在检查视频大小和网盘剩余空间' });
   let quota = await adapter.quota();
   if (!Number.isFinite(required) || required <= 0) throw new PanError('无法确认视频大小，暂不执行自动清理', 409, 'FILE_SIZE_UNKNOWN');
   if (required > quota.total) throw new PanError(`该文件约 ${(required / 1024 ** 3).toFixed(1)} GiB，超过网盘总容量 ${(quota.total / 1024 ** 3).toFixed(1)} GiB，清理也无法放入，请换较小版本`, 409, 'FILE_EXCEEDS_CAPACITY');
   if (quota.free >= required) return { deleted: 0, quota };
   if (!autoCleanupEnabled(adapter.provider, adapter.account)) throw new PanError('网盘空间不足，当前账号未开启自动清理，可在网盘连接管理中设置', 409, 'CAPACITY');
+  progress?.({ stage: 'cleaning', message: '空间不足，正在清理网盘旧资源和回收站', deleted: 0 });
   const candidates = await adapter.candidates(); let deleted = 0;
   const unique = [...new Map(candidates.map((e) => [(e.drive || '') + ':' + e.id, e])).values()].sort((a, b) => a.priority - b.priority || a.modified - b.modified);
   for (const entry of unique.slice(0, 200)) {
     if (adapter.protectedIds?.includes(entry.id) || storageProtected(adapter.provider, adapter.account, entry.id)) continue;
     const before = quota.used; await adapter.remove(entry); deleted++;
+    progress?.({ stage: 'cleaning', message: `正在清理网盘空间 · 已处理 ${deleted} 项旧资源`, deleted });
     quota = await adapter.quota();
     if (quota.free >= required) return { deleted, quota };
     // Capacity can lag deletion. Poll briefly; never keep deleting large files against a stale quota.
