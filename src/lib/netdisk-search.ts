@@ -2,18 +2,16 @@ import { discoverPanVideo } from './netdisk-discovery';
 import { createHash } from 'node:crypto';
 import { fetchUpstream } from './fetch-utils';
 import { isRelevantPanTitle, parsePanShare, plainText, qualityHint } from './netdisk-utils';
-import { extraPanSources, extraPanSearch } from './netdisk-search-extra';
+import { extraPanSearch } from './netdisk-search-extra';
 import type { PanProvider, PanResult, PanSearchEvent } from './netdisk-types';
 
-const SOURCES = [
-  ...extraPanSources,
-  { id: 'muou', name: '木偶网盘', origin: 'https://www.muoua.top' },
-  { id: 'quarktv', name: '夸克影视', origin: 'https://www.quarktv.com' },
-  { id: 'quark4k', name: '夸克 4K 社区', origin: 'https://quark4k.com' },
-] as const;
+import { enabledResourceSources, resourceSources } from './resource-source-store';
+import { customPanSearch } from './resource-pan-adapter';
+import type { ResourceSource } from './resource-source-types';
+const sourcesNow = () => enabledResourceSources('pan').map((v) => ({ ...v, origin: v.url }));
 const cache = new Map<string, { expires: number; list: PanResult[] }>();
 const health = new Map<string, { failures: number; nextCheck: number }>();
-export function panSources() { return SOURCES.map((s) => ({ id: s.id, name: s.name, status: ((health.get(s.id)?.nextCheck || 0) > Date.now() ? 'cooldown' : 'ready') as 'cooldown' | 'ready', nextCheck: health.get(s.id)?.nextCheck })); }
+export function panSources() { return resourceSources().sources.filter((v) => v.kind === 'pan' && v.enabled).map((s) => ({ id: s.id, name: s.name, enabled: s.enabled, status: ((health.get(s.id)?.nextCheck || 0) > Date.now() ? 'cooldown' : 'ready') as 'cooldown' | 'ready', nextCheck: health.get(s.id)?.nextCheck })); }
 export function extractQuarkLinks(text: string) {
   return extractPanLinks(text).filter((v) => v.provider === 'quark').map(({ url, passcode }) => ({ url, passcode }));
 }
@@ -42,10 +40,10 @@ export function parseSearchCards(html: string, provider: 'muou' | 'quarktv') {
     : /<h2[^>]*>\s*<a[^>]*href="[^"<>]*\/(\d+)\.html?"[^>]*>([\s\S]*?)<\/a>/g;
   return [...html.matchAll(pattern)].map((m) => ({ id: m[1], title: plainText(m[2]) }));
 }
-function result(source: typeof SOURCES[number], title: string, link: ReturnType<typeof parsePanShare>, checked: boolean): PanResult {
+function result(source: ResourceSource & { origin: string }, title: string, link: ReturnType<typeof parsePanShare>, checked: boolean): PanResult {
   return { id: createHash('sha256').update(source.id + link.url).digest('hex').slice(0, 24), title, source: source.id, sourceName: source.name, shareUrl: link.url, passcode: link.passcode, qualityHint: qualityHint(title), provider: link.provider, checked };
 }
-async function fromSource(source: typeof SOURCES[number], keyword: string, signal: AbortSignal, emit: (items: PanResult[]) => void, page: number, provider?: PanProvider) {
+async function fromSource(source: ResourceSource & { origin: string }, keyword: string, signal: AbortSignal, emit: (items: PanResult[]) => void, page: number, provider?: PanProvider) {
   const items: PanResult[] = [];
   const pending = new Set<string>();
   const add = async (title: string, content: string) => {
@@ -59,7 +57,8 @@ async function fromSource(source: typeof SOURCES[number], keyword: string, signa
     }
     const fresh = batch.filter((v) => !items.some((x) => x.id === v.id)); items.push(...fresh); if (fresh.length) emit(fresh);
   };
-  if (await extraPanSearch(source.id, keyword, page, provider, signal, add)) return items;
+  if (['pansou', 'pan-json', 'pan-cms'].includes(source.adapter)) { await customPanSearch(source, keyword, page, signal, add); return items; }
+  if (await extraPanSearch(source.adapter, keyword, page, provider, signal, add, source.origin)) return items;
   if (source.id === 'quark4k') {
     const query = new URLSearchParams({ include: 'firstPost,mostRelevantPost', 'page[limit]': '20', 'page[offset]': String((page - 1) * 20), ...(keyword ? { 'filter[q]': keyword } : {}) });
     const data = JSON.parse(await get(source.origin + '/api/discussions?' + query, signal));
@@ -90,14 +89,15 @@ async function fromSource(source: typeof SOURCES[number], keyword: string, signa
   if (cards.length && errors === cards.length) throw new Error('来源详情暂不可用');
   return items;
 }
+export async function testPanSource(source: ResourceSource, keyword: string, signal: AbortSignal) { const count = (await fromSource({ ...source, origin: source.url }, keyword, signal, () => {}, 1)).length; health.delete(source.id); return count; }
 export async function searchNetdisk(keyword: string, selected: string[], emit: (event: PanSearchEvent) => void, external: AbortSignal, options: { page?: number; provider?: PanProvider } = {}) {
-  const sources = SOURCES.filter((s) => selected.length === 0 || selected.includes(s.id));
+  const sources = sourcesNow().filter((s) => selected.length === 0 || selected.includes(s.id));
   let total = 0; let failures = 0;
   const seen = new Set<string>(); const checks: Promise<void>[] = []; let rejected = 0, unchecked = 0, checked = 0, verifying = 0;
   const discoverySignal = AbortSignal.any([external, AbortSignal.timeout(45_000)]);
   await Promise.all(sources.map(async (source) => {
     const start = Date.now();
-    const key = source.id + ':' + keyword + ':' + (options.page || 1) + ':' + (options.provider || 'all');
+    const key = source.id + ':' + source.origin + ':' + keyword + ':' + (options.page || 1) + ':' + (options.provider || 'all');
     const cached = cache.get(key);
     const received: PanResult[] = [];
     const publish = (list: PanResult[]) => {

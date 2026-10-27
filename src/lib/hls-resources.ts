@@ -4,17 +4,9 @@ import { decryptAes128CbcPrefix, looksLikeMp4, parseMp4VideoResolution, parseTsV
 import { isRelevantPanTitle, plainText } from './netdisk-utils';
 import { resourceTier } from './hls-resource-types';
 import { acquireHostSlot } from './host-gate';
+import verified4k from './verified-4k.json';
 export { resourceTier } from './hls-resource-types';
-export const HLS_SOURCES = [
-  { id: 'mangguo', name: '芒果 HLS', url: 'https://caiji.mgzyapi.com/api.php/provide/vod/' },
-  { id: 'guangsu', name: '光速 HLS', url: 'https://api.guangsuapi.com/api.php/provide/vod/' },
-  { id: 'baofeng', name: '暴风 HLS', url: 'https://bfzyapi.com/api.php/provide/vod/' },
-  { id: 'haohua', name: '豪华 HLS', url: 'https://hhzyapi.com/api.php/provide/vod/' },
-  { id: 'huya', name: '虎牙 HLS', url: 'https://www.huyaapi.com/api.php/provide/vod/' },
-  { id: 'jinying', name: '金鹰 HLS', url: 'https://jyzyapi.com/provide/vod/' },
-  { id: 'jisu', name: '极速 HLS', url: 'https://jszyapi.com/api.php/provide/vod/' },
-  { id: 'hongniu', name: '红牛 HLS', url: 'https://www.hongniuzy2.com/api.php/provide/vod/' },
-];
+import { enabledResourceSources, sourceRevisionKey, resourceHealth, recordResourceHealth } from './resource-source-store';
 export interface HlsInspection { width?: number; height?: number; declaredWidth?: number; declaredHeight?: number; evidence: 'segment' | 'manifest' | 'unknown'; duration: number; complete: boolean; bandwidth?: number; }
 export interface HlsResource extends HlsInspection { id: string; title: string; year: string; source: string; url: string; episodes: { name: string; url: string }[]; checkedAt: number; }
 export type HlsSearchEvent = { type: 'result'; item: HlsResource } | { type: 'progress'; sources: number; total: number; checked: number; candidates: number } | { type: 'done'; sources: number; total: number; checked: number; candidates: number; count: number; errors: number };
@@ -76,8 +68,8 @@ export async function inspectHls(url: string, signal: AbortSignal): Promise<HlsI
 }
 async function workers<T>(rows: T[], count: number, fn: (v: T) => Promise<void>) { let n = 0; await Promise.all(Array.from({ length: Math.min(count, rows.length) }, async () => { while (n < rows.length) await fn(rows[n++]); })); }
 export async function searchHlsResources(keyword: string, signal: AbortSignal, emit: (v: HlsSearchEvent) => void) {
-  const cached = cache.get(keyword); if (cached && cached.expires > Date.now()) { cached.value.forEach((item) => emit({ type: 'result', item })); emit({ type: 'done', ...cached.stats }); return; }
-  const stats = { sources: 0, total: HLS_SOURCES.length, checked: 0, candidates: 0, count: 0, errors: 0 }, seen = new Set<string>(), results: HlsResource[] = [];
+  const cacheKey = sourceRevisionKey() + ':' + keyword; const sources = enabledResourceSources('hls'); const cached = cache.get(cacheKey); if (cached && cached.expires > Date.now()) { cached.value.forEach((item) => emit({ type: 'result', item })); emit({ type: 'done', ...cached.stats }); return; }
+  const stats = { sources: 0, total: sources.length, checked: 0, candidates: 0, count: 0, errors: 0 }, seen = new Set<string>(), results: HlsResource[] = [];
   const all = AbortSignal.any([signal, AbortSignal.timeout(40_000)]);
   const jobs: { title: string; year: string; source: string; episodes: { name: string; url: string }[] }[] = [];
   const tasks: Promise<void>[] = [];
@@ -87,12 +79,16 @@ export async function searchHlsResources(keyword: string, signal: AbortSignal, e
       const item: HlsResource = { ...job, ...inspection, url, id: createHash('sha256').update(url).digest('hex').slice(0, 24), checkedAt: Date.now() }; results.push(item); stats.count++; emit({ type: 'result', item });
     } catch { stats.errors++; } finally { release(); stats.checked++; emit({ type: 'progress', ...stats }); }
   };
-  await workers(HLS_SOURCES, 4, async (source) => {
+  // Seed known 4K candidates ahead of slower catalogs, but recheck the actual media on every cache miss.
+  const knownSource = sources.find((s) => s.id === 'hls-zuid' && new URL(s.url).hostname === 'api.zuidapi.com');
+  if (knownSource) for (const film of verified4k.filter((v) => isRelevantPanTitle(v.title, keyword)).slice(0, 4)) { const job = { title: film.title, year: '', source: knownSource.name, episodes: [{ name: '正片', url: film.url }] }; seen.add(film.url); jobs.push(job); stats.candidates++; tasks.push(check(job)); }
+  await workers(sources.sort((a, b) => (a.priority || 0) - (b.priority || 0)), 6, async (source) => {
     if (all.aborted) return;
-    try { const url = new URL(source.url); url.search = new URLSearchParams({ ac: 'detail', wd: keyword }).toString(); const r = await bounded(url.href, all); const json = JSON.parse(r.bytes.toString('utf8')); for (const movie of (Array.isArray(json.list) ? json.list : []).slice(0, 20)) { const title = plainText(movie.vod_name, 200); if (!isRelevantPanTitle(title, keyword) || /解说|预告|花絮|伦理|写真/.test(title + String(movie.type_name || ''))) continue; const episodes = hlsEpisodes(movie.vod_play_url); if (!episodes.length || jobs.length >= 24 || jobs.filter((j) => j.source === source.name).length >= 4) continue; const first = episodes[0].url; if (seen.has(first)) continue; seen.add(first); const job = { title, year: plainText(movie.vod_year, 8), source: source.name, episodes }; jobs.push(job); stats.candidates = jobs.length; tasks.push(check(job)); } }
-    catch { stats.errors++; } finally { stats.sources++; stats.candidates = jobs.length; emit({ type: 'progress', ...stats }); }
+    if ((resourceHealth(source)?.nextCheck || 0) > Date.now()) { stats.sources++; emit({ type: 'progress', ...stats }); return; } const started = Date.now();
+    try { const url = new URL(source.url); url.searchParams.set('ac', 'detail'); url.searchParams.set('wd', keyword); const r = await bounded(url.href, all); const json = JSON.parse(r.bytes.toString('utf8')); if (!Array.isArray(json.list) && json.list !== null) throw new Error('目录响应格式无效'); recordResourceHealth(source, true, Date.now() - started); for (const movie of (Array.isArray(json.list) ? json.list : []).slice(0, 20).sort((a: Record<string, unknown>, b: Record<string, unknown>) => Number(/4k|2160p/i.test(String(b.vod_name))) - Number(/4k|2160p/i.test(String(a.vod_name))))) { const title = plainText(movie.vod_name, 200); if (!isRelevantPanTitle(title, keyword) || /解说|预告|花絮|伦理|写真/.test(title + String(movie.type_name || ''))) continue; const episodes = hlsEpisodes(movie.vod_play_url); if (!episodes.length || jobs.length >= 48 || jobs.filter((j) => j.source === source.name).length >= 3) continue; const first = episodes[0].url; if (seen.has(first)) continue; seen.add(first); const job = { title, year: plainText(movie.vod_year, 8), source: source.name, episodes }; jobs.push(job); stats.candidates = jobs.length; tasks.push(check(job)); } }
+    catch (e) { stats.errors++; if (!all.aborted) recordResourceHealth(source, false, Date.now() - started, e instanceof Error ? e.message : '查询失败'); } finally { stats.sources++; stats.candidates = jobs.length; emit({ type: 'progress', ...stats }); }
   });
   await Promise.all(tasks);
-  if (!signal.aborted && !all.aborted) { if (cache.size >= 40) cache.delete(cache.keys().next().value!); cache.set(keyword, { value: results, stats: { ...stats }, expires: Date.now() + (results.length ? 5 * 60_000 : 30_000) }); }
+  if (!signal.aborted && !all.aborted) { if (cache.size >= 40) cache.delete(cache.keys().next().value!); cache.set(cacheKey, { value: results, stats: { ...stats }, expires: Date.now() + (results.length ? 5 * 60_000 : 30_000) }); }
   emit({ type: 'done', ...stats });
 }

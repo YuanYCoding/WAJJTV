@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { readPanSearchState, writePanSearchState } from '@/lib/pan-search-state';
+import { readPanSearchState, writePanSearchState, clearPanSearchState } from '@/lib/pan-search-state';
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from './header';
@@ -13,6 +13,7 @@ import { PanDriveIcon, PanIcon, PanResourceCard, resourceDisplayTitle } from './
 
 export function PanSearchPage() {
   const params = useSearchParams(), accounts = usePanAccounts();
+  const refreshAccounts = accounts.refresh;
   const [keyword, setKeyword] = useState(params.get('q') || '');
   const [filter, setFilter] = useState<'all' | PanProvider>(params.get('provider') === 'aliyun' ? 'aliyun' : params.get('provider') === 'quark' ? 'quark' : 'all');
   const [rows, setRows] = useState<PanResult[]>([]), [busy, setBusy] = useState(false), [searched, setSearched] = useState('');
@@ -21,6 +22,7 @@ export function PanSearchPage() {
   const [rejected, setRejected] = useState(0), [unchecked, setUnchecked] = useState(0), [checking, setChecking] = useState(0);
   const snapshot = useRef<Parameters<typeof writePanSearchState>[0] | null>(null);
   const abort = useRef<AbortController | null>(null), run = useRef(0), initial = useRef(false);
+  useEffect(() => { const changed = () => { abort.current?.abort(); run.current++; setBusy(false); setRows([]); setSearched(''); snapshot.current = null; clearPanSearchState(); void refreshAccounts('quark').catch(() => {}); }; window.addEventListener('resource-sources-changed', changed); return () => window.removeEventListener('resource-sources-changed', changed); }, [refreshAccounts]);
   const search = async (word: string, nextPage = 1, latest = false) => {
     const q = word.trim().slice(0, 60); if (!q && !latest) return;
     const seq = ++run.current; abort.current?.abort(); const controller = new AbortController(); abort.current = controller;

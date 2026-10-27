@@ -4,6 +4,10 @@ import type ArtPlayer from 'artplayer';
 import type HlsType from 'hls.js';
 import type { PanQuality } from '@/lib/netdisk-types';
 import { directFallbackLoader, seekPosition } from '@/lib/pan-player-utils';
+import { PlaybackDiagnostics } from './playback-diagnostics';
+import { stableHlsConfig, bufferTarget, playbackMode } from '@/lib/playback-tuning';
+import { startupBufferReady } from '@/lib/startup-buffer';
+import { bufferedAhead } from '@/lib/playback-tuning';
 import { ViewingControls } from './viewing-controls';
 export function preloadPanPlayer() { void import('artplayer').catch(() => {}); void import('hls.js').catch(() => {}); }
 
@@ -31,8 +35,11 @@ export function NetdiskPlayer(props: Props) {
   }, [lease]);
   useEffect(() => {
     const host = container.current;
-    let disposed = false, art: ArtPlayer | null = null, hls: HlsType | undefined, lastSave = 0, restored = false, lastTime = -1, stuckSince = 0, lastRecovery = 0;
+    let disposed = false, art: ArtPlayer | null = null, hls: HlsType | undefined, lastSave = 0, restored = false, lastTime = -1, stuckSince = 0, lastRecovery = 0, hasPlayed = false;
+    const startupAt = Date.now(); let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    const startBuffered = () => { if (disposed || hasPlayed || !art) return; const v = art.video, ahead = bufferedAhead(v); if (startupBufferReady(ahead, v.duration, Date.now() - startupAt)) { hasPlayed = true; void art.play().catch(() => setStatus('视频已就绪，点击播放器开始')); } else setStatus(`正在预缓冲 ${ahead.toFixed(1)} / 8 秒…`); };
     let monitor: ReturnType<typeof setInterval> | undefined; let removeKeys = () => {}; let removeResize = () => {};
+    const changeMode = () => { if (!hls) return; hls.config.capLevelOnFPSDrop = playbackMode() === 'smooth'; if (playbackMode() === 'smooth') hls.currentLevel = -1; else if (hls.levels.length) hls.currentLevel = hls.levels.reduce((n, l, i, rows) => l.width * l.height > rows[n].width * rows[n].height ? i : n, 0); }; window.addEventListener('playback-mode-changed', changeMode);
     setError(''); setResolution(''); setStatus('正在连接播放线路…');
     if (position.current.identity !== identity) position.current = { identity, time: 0 };
     const save = () => { const video = art?.video; if (disposed || !video || video.ended || !Number.isFinite(video.duration)) return; position.current = { identity, time: video.currentTime }; try { localStorage.setItem('jjbitv:pan-progress:' + identity, String(video.currentTime)); } catch { /* optional */ } };
@@ -41,7 +48,7 @@ export function NetdiskPlayer(props: Props) {
       if (disposed || !host) return;
       Artplayer.LOG_VERSION = false;
       art = new Artplayer({
-        container: host, url: quality.url, type: quality.kind === 'hls' ? 'm3u8' : 'mp4', autoplay: true, volume: 0.8,
+        container: host, url: quality.url, type: quality.kind === 'hls' ? 'm3u8' : 'mp4', autoplay: quality.kind !== 'hls', volume: 0.8,
         theme: '#d3b278', lang: 'zh-cn', setting: true, playbackRate: true, pip: true, fullscreen: true, fullscreenWeb: true,
         hotkey: false, gesture: true, fastForward: true, lock: true, playsInline: true, miniProgressBar: true, mutex: true,
         moreVideoAttr: { playsInline: true, preload: 'metadata' },
@@ -52,18 +59,20 @@ export function NetdiskPlayer(props: Props) {
         customType: { m3u8: (video: HTMLVideoElement, url: string) => {
           if (hlsModule?.default.isSupported()) {
             const Hls = hlsModule.default;
-            hls = new Hls({ enableWorker: true, lowLatencyMode: false, maxBufferLength: 60, maxMaxBufferLength: 120, backBufferLength: 20, maxBufferSize: 48 * 1024 * 1024, loader: directFallbackLoader(hlsModule.FetchLoader), fetchSetup: (context, init) => new Request(context.url, { ...init, credentials: 'same-origin', referrerPolicy: 'no-referrer' }) });
+            hls = new Hls({ ...stableHlsConfig(), loader: directFallbackLoader(hlsModule.FetchLoader), fetchSetup: (context, init) => new Request(context.url, { ...init, credentials: 'same-origin', referrerPolicy: 'no-referrer' }) });
             hls.loadSource(url); hls.attachMedia(video); let networkRetries = 0, mediaRetries = 0;
-            if (latest.current.preferHighest) hls.on(Hls.Events.MANIFEST_PARSED, () => { if (!hls || !hls.levels.length) return; const best = hls.levels.reduce((index, level, i, levels) => level.width * level.height > levels[index].width * levels[index].height ? i : index, 0); hls.currentLevel = best; });
+            if (latest.current.preferHighest && playbackMode() === 'quality') hls.on(Hls.Events.MANIFEST_PARSED, () => { if (!hls || !hls.levels.length) return; const best = hls.levels.reduce((index, level, i, levels) => level.width * level.height > levels[index].width * levels[index].height ? i : index, 0); hls.currentLevel = best; });
+            hls.on(Hls.Events.FRAG_BUFFERED, (_, data) => { const duration = data.frag.duration, bytes = data.frag.stats.total; if (hls && duration > 0 && bytes > 0) hls.config.maxBufferLength = bufferTarget(bytes / duration, window.innerWidth < 760); startBuffered(); });
             hls.on(Hls.Events.ERROR, (_, data) => { if (!data.fatal || disposed) return; if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries++ < 2) { hls?.startLoad(video.currentTime); return; } if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRetries++ < 1) { hls?.recoverMediaError(); return; } setError('播放线路暂时不稳定，可以切换流畅画质或刷新地址'); recover(); });
           } else if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
           else setError('当前浏览器不支持这条视频线路，请更换浏览器或选择其他线路');
         } },
       });
       player.current = art;
+      if (quality.kind === 'hls') { startupTimer = setTimeout(startBuffered, Math.max(1, 12_000 - (Date.now() - startupAt))); if (!hlsModule?.default.isSupported()) art.video.addEventListener('canplay', startBuffered, { once: true }); }
       const report = () => { const v = art?.video; if (!disposed && v?.videoWidth) setResolution(`实测 ${v.videoWidth} × ${v.videoHeight}`); };
       art.on('video:loadedmetadata', () => { report(); if (restored || !art || !Number.isFinite(art.duration)) return; restored = true; let t = position.current.time; try { if (!t) t = Number(localStorage.getItem('jjbitv:pan-progress:' + identity)) || 0; } catch { /* optional */ } if (t > 0 && t < art.duration - 3) art.seek = t; });
-      art.on('video:playing', () => { setStatus(''); setError(''); stuckSince = 0; report(); });
+      art.on('video:playing', () => { hasPlayed = true; clearTimeout(startupTimer); setStatus(''); setError(''); stuckSince = 0; report(); });
       art.on('video:waiting', () => setStatus('正在缓冲…'));
       art.on('video:seeking', () => { setStatus('正在跳转…'); stuckSince = Date.now(); });
       art.on('video:seeked', () => setStatus(''));
@@ -80,13 +89,14 @@ export function NetdiskPlayer(props: Props) {
       window.addEventListener('keydown', keyboard); removeKeys = () => window.removeEventListener('keydown', keyboard);
       monitor = setInterval(() => { if (!art || art.video.paused || art.video.ended) { stuckSince = 0; return; } if (Math.abs(art.currentTime - lastTime) > .1 && !art.video.seeking) { lastTime = art.currentTime; stuckSince = 0; } else { stuckSince ||= Date.now(); if (Date.now() - stuckSince > 10_000) recover(); } }, 2000);
     }).catch(() => { if (!disposed) setError('播放器加载失败，请刷新页面'); });
-    return () => { save(); disposed = true; clearInterval(monitor); removeKeys(); removeResize(); hls?.destroy(); art?.destroy(false); host?.replaceChildren(); if (player.current === art) player.current = null; };
+    return () => { save(); disposed = true; clearTimeout(startupTimer); art?.video.removeEventListener('canplay', startBuffered); clearInterval(monitor); window.removeEventListener('playback-mode-changed', changeMode); removeKeys(); removeResize(); hls?.destroy(); art?.destroy(false); host?.replaceChildren(); if (player.current === art) player.current = null; };
   }, [quality.url, quality.kind, quality.original, identity]);
   return <section className={theater ? 'fixed inset-0 z-50 bg-black p-3 sm:p-6 flex flex-col justify-center' : 'mt-4'}>
     <div className="flex items-center justify-between gap-3 mb-3"><h2 className="font-medium truncate">{title}</h2><span className="text-xs text-accent shrink-0">{resolution || '正在读取实际画质'}</span></div>
     <div ref={box} className="relative aspect-video max-h-[78vh] bg-black rounded-xl overflow-hidden"><div ref={container} data-testid="pan-artplayer" className="h-full w-full" />{status && <div role="status" className="absolute top-3 left-3 pointer-events-none rounded bg-black/60 px-3 py-1.5 text-xs text-white">{status}</div>}</div>
     <div className="flex flex-wrap items-center gap-3 mt-4"><button className="btn-ghost btn-sm" onClick={onRefresh}>刷新播放地址</button>{onNext && <><button className="btn-ghost btn-sm" onClick={() => onNext()}>下一集</button><label className="flex gap-2 items-center text-xs text-muted"><input type="checkbox" checked={autoNext} onChange={(e) => { setAutoNext(e.target.checked); try { localStorage.setItem('jjbitv:pan-autonext', String(e.target.checked)); } catch { /* optional */ } }} />自动准备下一集</label></>}<span className="text-[11px] text-faint">← → 跳转10秒 · Shift 加速跳转 · 空格暂停</span></div>
     <ViewingControls playerRef={box} theater={theater} onTheater={() => setTheater((v) => !v)} />
+    <PlaybackDiagnostics container={box} />
     {error && <p role="alert" className="text-warning text-sm mt-3">{error}</p>}
     {props.notice && <p className="text-xs text-faint mt-3 leading-6">{props.notice}</p>}
   </section>;

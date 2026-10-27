@@ -1,0 +1,1129 @@
+{
+  "date": "2026-10-27",
+  "catalogCandidates": 73,
+  "withCandidateLinks": 37,
+  "catalogs": [
+    {
+      "name": "爱奇艺",
+      "url": "https://iqiyizyapi.com/api.php/provide/vod",
+      "ms": 1604,
+      "count": 2
+    },
+    {
+      "name": "魔都资源",
+      "url": "https://www.mdzyapi.com/api.php/provide/vod",
+      "ms": 811,
+      "count": 2
+    },
+    {
+      "name": "红牛资源",
+      "url": "https://www.hongniuzy3.com/api.php/provide/vod",
+      "ms": 656,
+      "count": 3
+    },
+    {
+      "name": "金鹰资源",
+      "url": "https://jyzyapi.com/provide/vod",
+      "ms": 754,
+      "count": 3
+    },
+    {
+      "name": "豪华资源",
+      "url": "https://hhzyapi.com/api.php/provide/vod",
+      "ms": 754,
+      "count": 3
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lziapi.com/api.php/provide/vod",
+      "ms": 846,
+      "count": 20
+    },
+    {
+      "name": "非凡新",
+      "url": "https://api.ffzyapi.com/api.php/provide/vod",
+      "ms": 988,
+      "count": 1
+    },
+    {
+      "name": "极速资源",
+      "url": "https://jszyapi.com/api.php/provide/vod",
+      "ms": 763,
+      "count": 3
+    },
+    {
+      "name": "虎牙资源",
+      "url": "https://www.huyaapi.com/api.php/provide/vod",
+      "ms": 691,
+      "count": 3
+    },
+    {
+      "name": "新浪",
+      "url": "https://api.xinlangapi.com/xinlangapi.php/provide/vod",
+      "ms": 721,
+      "count": 0
+    },
+    {
+      "name": "速播资源",
+      "url": "https://subocaiji.com/api.php/provide/vod",
+      "ms": 828,
+      "count": 3
+    },
+    {
+      "name": "光速资源",
+      "url": "https://api.guangsuapi.com/api.php/provide/vod",
+      "ms": 783,
+      "count": 3
+    },
+    {
+      "name": "电影天堂",
+      "url": "http://caiji.dyttzyapi.com/api.php/provide/vod",
+      "ms": 456,
+      "count": 1
+    },
+    {
+      "name": "360资源",
+      "url": "https://360zy.com/api.php/provide/vod",
+      "ms": 464,
+      "count": 2
+    },
+    {
+      "name": "暴风资源",
+      "url": "https://bfzyapi.com/api.php/provide/vod",
+      "ms": 751,
+      "count": 17
+    },
+    {
+      "name": "百度云zy",
+      "url": "https://api.apibdzy.com/api.php/provide/vod",
+      "ms": 1294,
+      "count": 1
+    },
+    {
+      "name": "U酷影视",
+      "url": "https://api.ukuapi88.com/api.php/provide/vod",
+      "ms": 3665,
+      "count": 2
+    },
+    {
+      "name": "最大资源",
+      "url": "https://api.zuidapi.com/api.php/provide/vod",
+      "ms": 1877,
+      "count": 2
+    },
+    {
+      "name": "魔都资源（备用接口）",
+      "url": "https://caiji.moduapi.cc/api.php/provide/vod",
+      "ms": 937,
+      "count": 2
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jyzyapi.com/api.php/provide/vod",
+      "ms": 870,
+      "count": 3
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jinyingzy.com/api.php/provide/vod",
+      "ms": 834,
+      "count": 3
+    },
+    {
+      "name": "红牛资源（备用接口）",
+      "url": "https://www.hongniuzy2.com/api.php/provide/vod",
+      "ms": 817,
+      "count": 3
+    },
+    {
+      "name": "非凡资源（备用接口）",
+      "url": "https://cj.ffzyapi.com/api.php/provide/vod",
+      "ms": 751,
+      "count": 1
+    },
+    {
+      "name": "虎牙资源（备用接口）",
+      "url": "https://www.huyaapi.com/api.php/provide/vod/at/json",
+      "ms": 665,
+      "count": 3
+    },
+    {
+      "name": "新浪资源（备用接口）",
+      "url": "http://api.xinlangapi.com/xinlangapi.php/provide/vod",
+      "ms": 450,
+      "count": 0
+    },
+    {
+      "name": "量子资源（备用接口）",
+      "url": "http://cj.lziapi.com/api.php/provide/vod",
+      "ms": 549,
+      "count": 20
+    },
+    {
+      "name": "非凡HTTP",
+      "url": "http://cj.ffzyapi.com/api.php/provide/vod",
+      "ms": 400,
+      "count": 1
+    },
+    {
+      "name": "360新",
+      "url": "https://360zyzz.com/api.php/provide/vod",
+      "ms": 1256,
+      "count": 2
+    },
+    {
+      "name": "最大资源（备用接口）",
+      "url": "http://zuidazy.me/api.php/provide/vod",
+      "ms": 1590,
+      "count": 2
+    },
+    {
+      "name": "天涯资源",
+      "url": "https://tyyszy.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "天涯影视",
+      "url": "https://tyyszyapi.com/api.php/provide/vod/?ac=list",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "旺旺资源",
+      "url": "https://api.wwzy.tv/api.php/provide/vod",
+      "error": "ConnectTimeout"
+    },
+    {
+      "name": "TV-旺旺短剧",
+      "url": "https://wwzy.tv/api.php/provide/vod",
+      "error": "ConnectTimeout"
+    },
+    {
+      "name": "天涯影视",
+      "url": "https://tyyszyapi.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "樱花资源",
+      "url": "https://m3u8.apiyhzy.com/api.php/provide/vod",
+      "error": "HTTPError"
+    },
+    {
+      "name": "🔅樱花资源ᴴ",
+      "url": "https://yhzy.cc/api.php/provide/vod",
+      "ms": 5410,
+      "count": 1
+    },
+    {
+      "name": "快车资源阿",
+      "url": "https://caiji.kuaichezy.org/api.php/provide",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "华为吧1",
+      "url": "https://huawei8.live/api.php/provide/vod",
+      "error": "ConnectTimeout"
+    },
+    {
+      "name": "优质资源",
+      "url": "https://api.yzzy-api.com/inc/apijson.php",
+      "error": "ConnectTimeout"
+    },
+    {
+      "name": "TV-1080资源库",
+      "url": "https://api.1080zyku.com/inc/api_mac10.php",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "1080资源",
+      "url": "https://api.1080zyku.com/inc/apijson.php",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "优质资源库",
+      "url": "https://api.yzzy-api.com/inc/ldg_api_all.php/provide/vod",
+      "error": "ConnectTimeout"
+    },
+    {
+      "name": "如意",
+      "url": "https://cj.rycjapi.com/api.php/provide/vod",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "如意资源",
+      "url": "http://cj.rycjapi.com/api.php/provide/vod",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "豆瓣资源",
+      "url": "https://dbzy.tv/api.php/provide/vod",
+      "ms": 1041,
+      "count": 0
+    },
+    {
+      "name": "快车新",
+      "url": "https://caiji.kuaichezy.org/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "闪电资源",
+      "url": "https://xsd.sdzyapi.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "TV-闪电资源",
+      "url": "https://sdzyapi.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "华为吧资源",
+      "url": "https://cjhwba.com/api.php/provide/vod",
+      "error": "HTTPError"
+    },
+    {
+      "name": "豆瓣资源",
+      "url": "https://caiji.dbzy5.com/api.php/provide/vod",
+      "ms": 892,
+      "count": 0
+    },
+    {
+      "name": "TV-淘片资源",
+      "url": "https://taopianapi.com/cjapi/mc10/vod/json.html",
+      "error": "SSLError"
+    },
+    {
+      "name": "无尽新",
+      "url": "https://api.wujinapi.me/api.php/provide/vod",
+      "ms": 665,
+      "count": 2
+    },
+    {
+      "name": "无尽影视",
+      "url": "https://api.wujinapi.com/api.php/provide/vod",
+      "ms": 707,
+      "count": 2
+    },
+    {
+      "name": "索尼新",
+      "url": "https://suoniapi.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "无尽资源4",
+      "url": "https://api.wujinapi.cc/api.php/provide/vod",
+      "ms": 623,
+      "count": 2
+    },
+    {
+      "name": "无尽资源3",
+      "url": "https://api.wujinapi.net/api.php/provide/vod",
+      "ms": 947,
+      "count": 2
+    },
+    {
+      "name": "茅台资源",
+      "url": "https://caiji.maotaizy.cc/api.php/provide/vod",
+      "ms": 1284,
+      "count": 0
+    },
+    {
+      "name": "卧龙资源",
+      "url": "https://wolongzyw.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "iKun资源",
+      "url": "https://ikunzyapi.com/api.php/provide/vod",
+      "ms": 619,
+      "count": 4
+    },
+    {
+      "name": "猫眼资源",
+      "url": "https://api.maoyanapi.top/api.php/provide/vod",
+      "ms": 1085,
+      "count": 1
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lzcaiji.com/api.php/provide/vod",
+      "ms": 929,
+      "count": 20
+    },
+    {
+      "name": "卧龙影视",
+      "url": "https://collect.wolongzyw.com/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "最大点播",
+      "url": "https://zuidazy.me/api.php/provide/vod",
+      "ms": 1879,
+      "count": 2
+    },
+    {
+      "name": "金鹰资源",
+      "url": "https://jyzyapi.com/provide/vod/from/jinyingyun/at/json",
+      "ms": 705,
+      "count": 3
+    },
+    {
+      "name": "飘零资源",
+      "url": "https://p2100.net/api.php/provide/vod",
+      "error": "HTTPError"
+    },
+    {
+      "name": "山海资源",
+      "url": "https://zy.sh0o.cn/api.php/provide/vod",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "优质新",
+      "url": "https://api.yyzy-tv.vip/inc/ldg_api.php",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "黑木耳国内",
+      "url": "https://json02.heimuer.xyz/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "黑木耳",
+      "url": "https://json.heimuer.xyz/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    },
+    {
+      "name": "茅台新",
+      "url": "https://caiji.maotai999.vip/api.php/provide/vod",
+      "ms": 1223,
+      "count": 0
+    },
+    {
+      "name": "芒果",
+      "url": "https://caiji.mgzyapi.com/api.php/provide/vod",
+      "ms": 1152,
+      "count": 4
+    },
+    {
+      "name": "飞速",
+      "url": "https://www.feisuzyapi.com/api.php/provide/vod",
+      "error": "ConnectionError"
+    },
+    {
+      "name": "无水印",
+      "url": "https://api.wsyzy.net/api.php/provide/vod",
+      "error": "JSONDecodeError"
+    }
+  ],
+  "mediaSamples": [
+    {
+      "name": "红牛资源",
+      "url": "https://www.hongniuzy3.com/api.php/provide/vod",
+      "catalogMs": 656,
+      "probeMs": 3101,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "金鹰资源",
+      "url": "https://jyzyapi.com/provide/vod",
+      "catalogMs": 754,
+      "probeMs": 4360,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "豪华资源",
+      "url": "https://hhzyapi.com/api.php/provide/vod",
+      "catalogMs": 754,
+      "probeMs": 4985,
+      "sample": {
+        "title": "星际穿越(普通话版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "爱奇艺",
+      "url": "https://iqiyizyapi.com/api.php/provide/vod",
+      "catalogMs": 1604,
+      "probeMs": 5196,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 1080,
+        "evidence": "segment",
+        "duration": 10162,
+        "complete": true
+      }
+    },
+    {
+      "name": "魔都资源",
+      "url": "https://www.mdzyapi.com/api.php/provide/vod",
+      "catalogMs": 811,
+      "probeMs": 6581,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 1080,
+        "declaredWidth": 1920,
+        "declaredHeight": 1080,
+        "evidence": "segment",
+        "duration": 10261,
+        "complete": true,
+        "bandwidth": 2000000
+      }
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lziapi.com/api.php/provide/vod",
+      "catalogMs": 846,
+      "probeMs": 3998,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1080,
+        "height": 606,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10221,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "非凡新",
+      "url": "https://api.ffzyapi.com/api.php/provide/vod",
+      "catalogMs": 988,
+      "probeMs": 2840,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10218,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "虎牙资源",
+      "url": "https://www.huyaapi.com/api.php/provide/vod",
+      "catalogMs": 691,
+      "probeMs": 3720,
+      "sample": {
+        "title": "星际穿越(普通话版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "电影天堂",
+      "url": "http://caiji.dyttzyapi.com/api.php/provide/vod",
+      "catalogMs": 456,
+      "probeMs": 2078,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 810,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10216,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "极速资源",
+      "url": "https://jszyapi.com/api.php/provide/vod",
+      "catalogMs": 763,
+      "probeMs": 4392,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "光速资源",
+      "url": "https://api.guangsuapi.com/api.php/provide/vod",
+      "catalogMs": 783,
+      "probeMs": 4894,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1920,
+        "declaredHeight": 1080,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true,
+        "bandwidth": 4096000
+      }
+    },
+    {
+      "name": "速播资源",
+      "url": "https://subocaiji.com/api.php/provide/vod",
+      "catalogMs": 828,
+      "probeMs": 5492,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "360资源",
+      "url": "https://360zy.com/api.php/provide/vod",
+      "catalogMs": 464,
+      "probeMs": 3774,
+      "sample": {
+        "title": "《星际穿越》中的科学",
+        "width": 1280,
+        "height": 720,
+        "declaredWidth": 1280,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 3092,
+        "complete": true,
+        "bandwidth": 1994000
+      }
+    },
+    {
+      "name": "百度云zy",
+      "url": "https://api.apibdzy.com/api.php/provide/vod",
+      "catalogMs": 1294,
+      "probeMs": 4276,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 800,
+        "evidence": "segment",
+        "duration": 9724,
+        "complete": true
+      }
+    },
+    {
+      "name": "U酷影视",
+      "url": "https://api.ukuapi88.com/api.php/provide/vod",
+      "catalogMs": 3665,
+      "probeMs": 3618,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1920,
+        "declaredHeight": 808,
+        "evidence": "segment",
+        "duration": 9729,
+        "complete": true,
+        "bandwidth": 2000000
+      }
+    },
+    {
+      "name": "最大资源",
+      "url": "https://api.zuidapi.com/api.php/provide/vod",
+      "catalogMs": 1877,
+      "probeMs": 4098,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1920,
+        "declaredHeight": 808,
+        "evidence": "segment",
+        "duration": 3381,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jyzyapi.com/api.php/provide/vod",
+      "catalogMs": 870,
+      "probeMs": 4823,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "红牛资源（备用接口）",
+      "url": "https://www.hongniuzy2.com/api.php/provide/vod",
+      "catalogMs": 817,
+      "probeMs": 4014,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "非凡资源（备用接口）",
+      "url": "https://cj.ffzyapi.com/api.php/provide/vod",
+      "catalogMs": 751,
+      "probeMs": 2428,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10218,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "金鹰资源（备用接口）",
+      "url": "https://jinyingzy.com/api.php/provide/vod",
+      "catalogMs": 834,
+      "probeMs": 5758,
+      "sample": {
+        "title": "星际穿越(原声版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "暴风资源",
+      "url": "https://bfzyapi.com/api.php/provide/vod",
+      "catalogMs": 751,
+      "probeMs": 13574,
+      "sample": {
+        "title": "《星际穿越》中的科学",
+        "width": 1280,
+        "height": 720,
+        "evidence": "segment",
+        "duration": 2949,
+        "complete": true
+      }
+    },
+    {
+      "name": "非凡HTTP",
+      "url": "http://cj.ffzyapi.com/api.php/provide/vod",
+      "catalogMs": 400,
+      "probeMs": 1535,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10218,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "魔都资源（备用接口）",
+      "url": "https://caiji.moduapi.cc/api.php/provide/vod",
+      "catalogMs": 937,
+      "probeMs": 12207,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 1080,
+        "declaredWidth": 1920,
+        "declaredHeight": 1080,
+        "evidence": "segment",
+        "duration": 10261,
+        "complete": true,
+        "bandwidth": 2000000
+      }
+    },
+    {
+      "name": "量子资源（备用接口）",
+      "url": "http://cj.lziapi.com/api.php/provide/vod",
+      "catalogMs": 549,
+      "probeMs": 4009,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1080,
+        "height": 606,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10221,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    },
+    {
+      "name": "虎牙资源（备用接口）",
+      "url": "https://www.huyaapi.com/api.php/provide/vod/at/json",
+      "catalogMs": 665,
+      "probeMs": 5083,
+      "sample": {
+        "title": "星际穿越(普通话版)",
+        "width": 1920,
+        "height": 808,
+        "evidence": "segment",
+        "duration": 10144,
+        "complete": true
+      }
+    },
+    {
+      "name": "🔅樱花资源ᴴ",
+      "url": "https://yhzy.cc/api.php/provide/vod",
+      "catalogMs": 5410,
+      "probeMs": 688
+    },
+    {
+      "name": "最大资源（备用接口）",
+      "url": "http://zuidazy.me/api.php/provide/vod",
+      "catalogMs": 1590,
+      "probeMs": 4301,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1920,
+        "declaredHeight": 808,
+        "evidence": "segment",
+        "duration": 3381,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "360新",
+      "url": "https://360zyzz.com/api.php/provide/vod",
+      "catalogMs": 1256,
+      "probeMs": 4404,
+      "sample": {
+        "title": "《星际穿越》中的科学",
+        "width": 1280,
+        "height": 720,
+        "declaredWidth": 1280,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 3092,
+        "complete": true,
+        "bandwidth": 1994000
+      }
+    },
+    {
+      "name": "无尽新",
+      "url": "https://api.wujinapi.me/api.php/provide/vod",
+      "catalogMs": 665,
+      "probeMs": 3614,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1710,
+        "height": 720,
+        "declaredWidth": 1710,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 5126,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "无尽资源4",
+      "url": "https://api.wujinapi.cc/api.php/provide/vod",
+      "catalogMs": 623,
+      "probeMs": 3451,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1710,
+        "height": 720,
+        "declaredWidth": 1710,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 5126,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "无尽影视",
+      "url": "https://api.wujinapi.com/api.php/provide/vod",
+      "catalogMs": 707,
+      "probeMs": 4281,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1710,
+        "height": 720,
+        "declaredWidth": 1710,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 5126,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "无尽资源3",
+      "url": "https://api.wujinapi.net/api.php/provide/vod",
+      "catalogMs": 947,
+      "probeMs": 3050,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1710,
+        "height": 720,
+        "declaredWidth": 1710,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 5126,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "最大点播",
+      "url": "https://zuidazy.me/api.php/provide/vod",
+      "catalogMs": 1879,
+      "probeMs": 2113,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1920,
+        "height": 808,
+        "declaredWidth": 1920,
+        "declaredHeight": 808,
+        "evidence": "segment",
+        "duration": 3381,
+        "complete": true,
+        "bandwidth": 128
+      }
+    },
+    {
+      "name": "猫眼资源",
+      "url": "https://api.maoyanapi.top/api.php/provide/vod",
+      "catalogMs": 1085,
+      "probeMs": 3556,
+      "sample": {
+        "title": "《星际穿越》中的科学 The Science of Interstellar",
+        "width": 1280,
+        "height": 720,
+        "declaredWidth": 1280,
+        "declaredHeight": 720,
+        "evidence": "segment",
+        "duration": 3074,
+        "complete": true,
+        "bandwidth": 1994000
+      }
+    },
+    {
+      "name": "芒果",
+      "url": "https://caiji.mgzyapi.com/api.php/provide/vod",
+      "catalogMs": 1152,
+      "probeMs": 3547,
+      "sample": {
+        "title": "星际穿越4K",
+        "width": 2596,
+        "height": 1080,
+        "declaredWidth": 2596,
+        "declaredHeight": 1080,
+        "evidence": "segment",
+        "duration": 10170,
+        "complete": true,
+        "bandwidth": 3719000
+      }
+    },
+    {
+      "name": "iKun资源",
+      "url": "https://ikunzyapi.com/api.php/provide/vod",
+      "catalogMs": 619,
+      "probeMs": 7889,
+      "sample": {
+        "title": "《星际穿越》中的科学",
+        "width": 1280,
+        "height": 716,
+        "declaredWidth": 1280,
+        "declaredHeight": 716,
+        "evidence": "segment",
+        "duration": 3109,
+        "complete": true,
+        "bandwidth": 2000000
+      }
+    },
+    {
+      "name": "量子资源",
+      "url": "https://cj.lzcaiji.com/api.php/provide/vod",
+      "catalogMs": 929,
+      "probeMs": 12258,
+      "sample": {
+        "title": "星际穿越",
+        "width": 1080,
+        "height": 606,
+        "declaredWidth": 1080,
+        "declaredHeight": 608,
+        "evidence": "segment",
+        "duration": 10221,
+        "complete": true,
+        "bandwidth": 800000
+      }
+    }
+  ],
+  "fourKCategory": {
+    "tested": 120,
+    "inspected": 119,
+    "encoded4k": 80,
+    "qualifiedLongForm": 79,
+    "note": "Includes language versions. Encoded dimensions are not proof of a native 4K master."
+  },
+  "threePositionChecks": [
+    {
+      "title": "攻壳机动队4K",
+      "samples": [
+        {
+          "position": "start",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2074
+            }
+          ]
+        },
+        {
+          "position": "middle",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2074
+            }
+          ]
+        },
+        {
+          "position": "end",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2074
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "倩女幽魂",
+      "samples": [
+        {
+          "position": "start",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2064
+            }
+          ]
+        },
+        {
+          "position": "middle",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2064
+            }
+          ]
+        },
+        {
+          "position": "end",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 2064
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "超级马力欧兄弟大电影4K",
+      "samples": [
+        {
+          "position": "start",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 1600
+            }
+          ]
+        },
+        {
+          "position": "middle",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 1600
+            }
+          ]
+        },
+        {
+          "position": "end",
+          "http": 206,
+          "cors": "https://zhuiju.zhaxueit.cn",
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 3840,
+              "height": 1600
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Drawer } from './drawer';
+import dynamic from 'next/dynamic';
+const ResourceSourceManager = dynamic(() => import('./resource-source-manager').then((m) => m.ResourceSourceManager));
 import { ConfirmDialog } from './confirm-dialog';
 import { Icon, type IconName } from './icon';
 import { LiveSourceManager } from './live-source-manager';
@@ -39,7 +41,7 @@ import { describeParseStats } from '@/lib/tvbox-parser';
  */
 
 type PrimaryTab = 'sources' | 'prefs' | 'data';
-type SecondaryTab = 'vod' | 'live' | 'subs' | 'playback' | 'image' | 'home' | 'io';
+type SecondaryTab = 'vod' | 'live' | 'subs' | 'pan' | 'hls' | 'playback' | 'image' | 'home' | 'io';
 
 const PRIMARY_TABS: { id: PrimaryTab; label: string; icon: IconName }[] = [
   { id: 'sources', label: '源管理', icon: 'link' },
@@ -50,6 +52,8 @@ const PRIMARY_TABS: { id: PrimaryTab; label: string; icon: IconName }[] = [
 const SECONDARY_TABS: Record<PrimaryTab, { id: SecondaryTab; label: string }[]> = {
   sources: [
     { id: 'vod', label: '点播源' },
+    { id: 'pan', label: '网盘接口' },
+    { id: 'hls', label: 'M3U8 接口' },
     { id: 'live', label: '直播源' },
     { id: 'subs', label: '数据源订阅' },
   ],
@@ -131,6 +135,8 @@ export function SourceManagerDrawer({ open, onClose }: { open: boolean; onClose:
       }
     >
       {current === 'vod' && <VodSourcesPanel />}
+      {current === 'pan' && <ResourceSourceManager key="pan" kind="pan" />}
+      {current === 'hls' && <ResourceSourceManager key="hls" kind="hls" />}
       {current === 'live' && <LiveSourceManager />}
       {current === 'playback' && <PlaybackPanel />}
       {current === 'image' && <ImagePanel />}
@@ -190,7 +196,7 @@ function TabRow<T extends string>({
                     active ? 'bg-surface-raised text-accent font-medium shadow-sm' : 'text-muted hover:text-content'
                   )
                 : cn(
-                    'px-2.5 py-1 text-xs',
+                    'px-1 py-1 text-xs !whitespace-normal leading-5',
                     active ? 'bg-accent/10 text-accent font-medium' : 'text-muted hover:text-content hover:bg-hover'
                   )
             )}

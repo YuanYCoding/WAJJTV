@@ -15,14 +15,14 @@ type Row = { title: string; content: string };
 export function parseYunsoCards(html: string): Row[] {
   return [...html.matchAll(/<a\b([^>]*\burl="[^">]+"[^>]*)>([\s\S]*?)<\/a>/g)].map((m) => ({ title: plainText(m[2]), content: (m[1].match(/\burl="([^">]+)"/)?.[1] || '') + ' 提取码：' + (m[1].match(/\bpa="([^">]*)"/)?.[1] || '') }));
 }
-export async function extraPanSearch(id: string, keyword: string, page: number, provider: PanProvider | undefined, signal: AbortSignal, add: (title: string, content: string) => Promise<void>): Promise<boolean> {
-  const source = extraPanSources.find((s) => s.id === id); if (!source) return false;
+export async function extraPanSearch(id: string, keyword: string, page: number, provider: PanProvider | undefined, signal: AbortSignal, add: (title: string, content: string) => Promise<void>, originOverride?: string): Promise<boolean> {
+  const base = extraPanSources.find((s) => s.id === id); if (!base) return false; const source = { ...base, origin: originOverride || base.origin };
   if (id === 'wanou') {
     const data = JSON.parse(await panGet(source.origin + '/api.php/provide/vod?' + new URLSearchParams({ ac: 'detail', wd: keyword, pg: String(page) }), signal));
     if (!Array.isArray(data.list)) throw new Error('玩偶片库响应异常');
     await panWorkers(data.list as Record<string, unknown>[], 3, signal, (v) => add(plainText(v.vod_name), String(v.vod_down_url || '') + ' ' + String(v.vod_play_url || '')));
   } else if (id === 'aipan') {
-    for (const movie of await aipanCatalog(keyword, page, signal)) for (const link of movie.links) await add(movie.title + ' ' + link.name, link.url);
+    for (const movie of await aipanCatalog(keyword, page, signal, source.origin)) for (const link of movie.links) await add(movie.title + ' ' + link.name, link.url);
   } else if (id === 'pan365') {
     await Promise.all((provider ? [provider] : ['aliyun', 'quark']).map(async (kind) => {
       const data = JSON.parse(await panGet(source.origin + '/api/interface/search?' + new URLSearchParams({ keyword, disk_type: kind, page: String(page), pageSize: '20' }), signal));
