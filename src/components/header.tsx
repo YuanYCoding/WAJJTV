@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeToggle } from './theme';
@@ -38,11 +39,9 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
   return (
     <>
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
-          <Link href="/" aria-label="LibreTV 首页" className="flex items-center shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/icon-512.png" alt="LibreTV" className="w-7 h-7 rounded-lg" />
-          </Link>
+        <div className="cinema-shell mx-auto h-16 flex items-center gap-3">
+          <Link href="/" aria-label="JjBiTV 首页" className="wajjtv-brand shrink-0"><Image src="/icons/jjbitv-192.png" width="36" height="36" alt="" className="rounded-xl" /><span>JjBiTV</span></Link>
+          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' || pathname === '/collection' ? 'active' : ''}>发现</Link><Link href="/pan" className={pathname.startsWith('/pan') ? 'active' : ''}>网盘追剧</Link><Link href="/resources" className={pathname === '/resources' ? 'active' : ''}>其他资源</Link><Link href="/live" className={pathname === '/live' ? 'active' : ''}>直播</Link></nav>}
 
           {showSearch && (
             <form
@@ -96,44 +95,25 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
 
           <div className="flex-1 sm:hidden" />
 
-          <nav className="flex items-center gap-1 ml-auto">
-            <HeaderLink href="/live" active={pathname === '/live'}>
-              直播
-            </HeaderLink>
-            <HeaderLink href="/about" active={pathname === '/about'}>
-              关于
-            </HeaderLink>
+          <nav className="utility-nav flex items-center gap-1 ml-auto">
+            <span className="utility-secondary flex items-center">
             <ThemeToggle />
-            <IconButton label="观看历史" onClick={() => setHistoryOpen(true)}>
-              <Icon name="clock" />
-            </IconButton>
-            <IconButton label="下载管理" onClick={requestShowDownloadManager}>
+            </span>
+            <span className="history-access"><IconButton label="观看历史" onClick={() => setHistoryOpen(true)}><Icon name="clock" /></IconButton></span>
+            <span className="desktop-download"><IconButton label="下载管理" onClick={requestShowDownloadManager}>
               <Icon name="download" />
-            </IconButton>
+            </IconButton></span>
             <IconButton label="设置" onClick={() => setSettingsOpen(true)}>
               <Icon name="gear" />
             </IconButton>
           </nav>
         </div>
       </header>
+      {!['/watch', '/live'].includes(pathname) && <nav className="mobile-cinema-nav" aria-label="手机主导航"><Link href="/" aria-current={pathname === '/' || pathname === '/collection' ? 'page' : undefined}>发现</Link><Link href="/pan" aria-current={pathname.startsWith('/pan') ? 'page' : undefined}>网盘追剧</Link><Link href="/resources" aria-current={pathname === '/resources' ? 'page' : undefined}>其他资源</Link><Link href="/live" aria-current={pathname === '/live' ? 'page' : undefined}>直播</Link></nav>}
 
       <SourceManagerDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />
     </>
-  );
-}
-
-function HeaderLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'px-2.5 py-1.5 rounded-md text-sm transition-colors',
-        active ? 'text-content bg-hover' : 'text-muted hover:text-content'
-      )}
-    >
-      {children}
-    </Link>
   );
 }
 

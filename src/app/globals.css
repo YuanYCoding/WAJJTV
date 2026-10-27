@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 /*
  * 语义化配色（RGB 三元组，供 Tailwind 以 <alpha-value> 注入透明度）：
  * 深色主题沿用旧版 LibreTV 配色；浅色主题为对应的白底变体。
@@ -186,5 +187,34 @@ body {
   .art-control-fullscreen {
     width: 40px !important;
     min-width: 40px !important;
+  }
+}
+
+/* Netdisk adds two seek controls. Preserve outline SVGs and keep every essential
+   control visible even on a narrow portrait player. */
+[data-testid="pan-artplayer"] .art-control-back-10 svg path,
+[data-testid="pan-artplayer"] .art-control-forward-10 svg path {
+  fill: none !important;
+}
+[data-testid="pan-artplayer"] .art-control-back-10 svg text,
+[data-testid="pan-artplayer"] .art-control-forward-10 svg text {
+  fill: currentColor;
+}
+@media (max-width: 640px) {
+  [data-testid="pan-artplayer"] .art-control-fullscreenWeb {
+    display: none !important;
+  }
+  [data-testid="pan-artplayer"] .art-control-playAndPause,
+  [data-testid="pan-artplayer"] .art-control-back-10,
+  [data-testid="pan-artplayer"] .art-control-forward-10,
+  [data-testid="pan-artplayer"] .art-control-setting,
+  [data-testid="pan-artplayer"] .art-control-fullscreen {
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 0 2px;
+  }
+  [data-testid="pan-artplayer"] .art-control-time {
+    font-size: 10px;
+    white-space: nowrap;
   }
 }

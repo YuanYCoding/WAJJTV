@@ -1,4 +1,5 @@
 'use client';
+import { nextHealth } from './source-health';
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -137,15 +138,10 @@ export function keyBelongsToSubscription(key: string, prefix: string): boolean {
   return key === prefix || key.startsWith(`${prefix}_`);
 }
 
-/** 点播源自动停用阈值：连续失败/超时达到该次数即暂停该源参与搜索 */
+/** 连续失败两次后跳过搜索；后台复检成功才恢复。 */
 export const SOURCE_DISABLE_THRESHOLD = 2;
-/**
- * 自动停用阶梯（毫秒），按「第几次被自动停用」逐级加重：
- * 固定时长的问题是，彻底挂掉的源会每隔 30 分钟被重新试一次、每次都要白等一轮超时；
- * 而偶发的网络抖动又不该被长期惩罚，所以第 1 级保持得很轻。
- * 下标 i 对应第 i+1 次停用；超出数组长度则进入长期停用（permanent）。
- */
-export const SOURCE_DISABLE_LADDER = [30 * 60 * 1000, 24 * 60 * 60 * 1000];
+/** 复检等待时间，最后一级会持续重试，不永久删除源。 */
+export const SOURCE_DISABLE_LADDER = [5, 15, 30, 60].map((n) => n * 60_000);
 
 /** 一次「源被自动停用」的事件，供调用方按级别提示 */
 export interface SourceDisableEvent {
@@ -160,6 +156,8 @@ export interface SourceDisableEvent {
 
 /** 点播源健康度条目（按 sourceKey），随搜索结果滚动更新 */
 export interface SourceHealthEntry {
+  /** Must pass a recovery probe before rejoining search, even after the deadline. */
+  unavailable?: boolean;
   ok: boolean;
   ms?: number;
   error?: string;
@@ -652,55 +650,18 @@ export const useAppStore = create<AppState>()(
       },
 
       recordSourceHealth: (outcomes) => {
-        if (outcomes.length === 0) return [];
-        const now = Date.now();
-        const health: Record<string, SourceHealthEntry> = {};
-        // 顺带清理陈旧条目：超过 7 天没再参与过搜索的源，其惩罚等级一并作废
-        for (const [key, e] of Object.entries(get().sourceHealth)) {
-          if (now - e.timestamp < 7 * 24 * 60 * 60 * 1000) health[key] = e;
-        }
+        if (!outcomes.length) return [];
+        const health = { ...get().sourceHealth };
         const events: SourceDisableEvent[] = [];
         for (const o of outcomes) {
-          const prev = health[o.sourceKey];
-          // 停用期已过 → 上一次的连续失败已被「停用 + 恢复」打断，重新从 1 开始累计
-          const interrupted = !!prev?.disabledUntil && prev.disabledUntil <= now;
-          const failStreak = o.ok ? 0 : interrupted ? 1 : (prev?.failStreak ?? 0) + 1;
-          // 成功一次即降一级（而非清零）：偶发抽风的源会自己降回来，
-          // 从未成功过的死源才会一路升到长期停用
-          const disableCount = o.ok
-            ? Math.max(0, (prev?.disableCount ?? 0) - 1)
-            : (prev?.disableCount ?? 0);
-          // entry 覆盖旧记录：成功时停用标记随之消失（立即恢复）
-          const entry: SourceHealthEntry = {
-            ok: o.ok,
-            ms: o.ms,
-            error: o.error,
-            timedOut: o.timedOut,
-            failStreak,
-            disableCount,
-            timestamp: now,
-          };
-          if (!o.ok && failStreak >= SOURCE_DISABLE_THRESHOLD) {
-            const alreadyDisabled = prev?.permanent === true || (prev?.disabledUntil ?? 0) > now;
-            if (alreadyDisabled) {
-              // 已在停用期内（正常不会参与搜索，此处仅作防御）：保持原等级与截止时间
-              entry.disableCount = prev?.disableCount ?? disableCount;
-              entry.disabledUntil = prev?.disabledUntil;
-              entry.permanent = prev?.permanent;
-            } else {
-              // 第 N 次被停用 → 取阶梯第 N 级；阶梯用尽则进入长期停用
-              const nextLevel = disableCount + 1;
-              const ttlMs: number | undefined = SOURCE_DISABLE_LADDER[nextLevel - 1];
-              entry.disableCount = nextLevel;
-              if (ttlMs === undefined) {
-                entry.permanent = true;
-              } else {
-                entry.disabledUntil = now + ttlMs;
-              }
-              events.push({ key: o.sourceKey, level: nextLevel, permanent: ttlMs === undefined, ttlMs });
-            }
-          }
-          health[o.sourceKey] = entry;
+          if (o.skipped) continue;
+          const p = health[o.sourceKey];
+          const wasUnavailable = !!(p?.unavailable || p?.disabledUntil || p?.permanent);
+          const previous = p ? { status: wasUnavailable ? 'unavailable' as const : p.ok ? 'healthy' as const : 'suspect' as const, failures: p.failStreak, recoveryLevel: p.disableCount || 0, checkedAt: p.timestamp, nextCheckAt: p.disabledUntil || 0 } : undefined;
+          const n = nextHealth(previous, o.ok, o.ms, o.error);
+          const unavailable = n.status === 'unavailable';
+          health[o.sourceKey] = { ok: o.ok, ms: o.ms, error: o.error, timedOut: o.timedOut, failStreak: n.failures, disableCount: n.recoveryLevel, unavailable, disabledUntil: unavailable ? n.nextCheckAt : undefined, timestamp: n.checkedAt };
+          if (unavailable && !wasUnavailable) events.push({ key: o.sourceKey, level: n.recoveryLevel + 1, permanent: false, ttlMs: n.nextCheckAt - n.checkedAt });
         }
         set({ sourceHealth: health });
         return events;
@@ -860,17 +821,18 @@ export function resolveSource(
 
 /**
  * 源当前是否处于自动停用期（连续超时/失败触发）。
- * 临时停用到期后此判断自然翻转为 false，即「到期自动恢复参与搜索」的懒实现；
- * 长期停用（阶梯用尽）没有到期时间，只有手动恢复（clearSourceHealth）才能解除。
+ * 临时停用到期仅允许后台复检，不直接恢复参与搜索；
+ * 兼容旧版长期停用标记，后台复检成功后统一清除。
  */
 export function isSourceDisabled(
   state: Pick<AppState, 'sourceHealth'>,
   key: string,
   now = Date.now()
 ): boolean {
+  void now; // Kept for callers; elapsed cooldowns require a successful probe.
   const e = state.sourceHealth[key];
   if (!e) return false;
-  return e.permanent === true || (!!e.disabledUntil && e.disabledUntil > now);
+  return e.unavailable === true || e.permanent === true || !!e.disabledUntil;
 }
 
 /**

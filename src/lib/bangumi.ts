@@ -23,6 +23,8 @@ interface BangumiSubject {
   name_cn?: string;
   images?: { large?: string; common?: string; medium?: string; small?: string; grid?: string };
   rating?: { score?: number };
+  air_date?: string;
+  summary?: string;
 }
 
 interface BangumiCalendarDay {
@@ -37,6 +39,7 @@ export function subjectToItem(subject: BangumiSubject): DoubanItem | undefined {
   if (!subject.id || !title || !cover) return undefined;
   const score = subject.rating?.score ?? 0;
   return {
+    provider: 'bangumi', providerId: String(subject.id), year: subject.air_date?.slice(0, 4), synopsis: subject.summary,
     id: String(subject.id),
     title,
     cover,

@@ -1,0 +1,4 @@
+.resourceCard{height:auto!important;min-height:230px;contain-intrinsic-size:auto 230px}
+.resourceCard>*{flex-shrink:0}
+.resourceCard h2{min-height:28px}
+.sourceWarning{font-size:11px;color:rgb(var(--c-muted));margin-bottom:14px;line-height:1.7}

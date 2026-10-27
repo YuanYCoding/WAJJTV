@@ -10,6 +10,8 @@ import {
   getVideoPrefetcher,
   getNextEpisodePrefetcher,
 } from '@/lib/video-prefetcher';
+import { PlaybackDiagnostics } from './playback-diagnostics';
+import { stableHlsConfig, bufferTarget, bufferedAhead, playbackMode } from '@/lib/playback-tuning';
 import { loadCacheSettings } from '@/lib/video-cache';
 import { formatTime } from '@/lib/utils';
 import { prefersTouchPointer } from '@/lib/touch-pointer';
@@ -139,10 +141,10 @@ export function PlayerShell({
     return {
       debug: false,
       enableWorker: true,
-      backBufferLength: 90,
-      maxBufferLength: cacheEnabled ? 120 : 30,
-      maxMaxBufferLength: cacheEnabled ? 600 : 60,
-      maxBufferSize: (cacheEnabled ? 90 : 30) * 1000 * 1000,
+      ...stableHlsConfig(),
+      maxBufferLength: cacheEnabled ? 60 : 45,
+      maxMaxBufferLength: 90,
+      maxBufferSize: 96 * 1024 * 1024,
       maxBufferHole: 0.5,
       fragLoadingMaxRetry: 6,
       fragLoadingRetryDelay: 1000,
@@ -160,14 +162,17 @@ export function PlayerShell({
   const ensurePrefetch = (mediaUrl: string, currentTime: number, horizonSeconds?: number) => {
     const p = propsRef.current;
     if (!p.episodeKey) return;
+    const video = artRef.current?.video as HTMLVideoElement | undefined; if (video && !video.paused && bufferedAhead(video) < 45) { getVideoPrefetcher().setThrottled(true); getNextEpisodePrefetcher().setThrottled(true); return; }
+    getVideoPrefetcher().setThrottled(false);
     getVideoPrefetcher().ensure({
+      concurrency: video?.paused ? 2 : 1,
       m3u8Url: mediaUrl,
       currentTime,
       episodeKey: p.episodeKey,
       horizonSeconds,
       onProgress: (stats) => {
         // 当前集预取完成且存在下一集：用独立预取器预热下一集前 7 分钟
-        if (stats.state === 'done' && p.nextUrl && p.nextEpisodeKey) {
+        if (stats.state === 'done' && p.nextUrl && p.nextEpisodeKey && (video?.paused || (video && bufferedAhead(video) > 90))) {
           getNextEpisodePrefetcher().ensure({
             m3u8Url: p.nextUrl,
             currentTime: 0,
@@ -252,8 +257,8 @@ export function PlayerShell({
       if (typeof height === 'number') reportQuality(height);
     });
     // 分片真正进入 MSE buffer 才算媒体恢复：此时视频轨可渲染，错误态可解除
-    hls.on(Hls.Events.FRAG_BUFFERED, () => {
-      mediaHealthyRef.current = true;
+    hls.on(Hls.Events.FRAG_BUFFERED, (_evt, data) => {
+      mediaHealthyRef.current = true; const duration = data.frag.duration, bytes = data.frag.stats.total; if (duration > 0 && bytes > 0) hls.config.maxBufferLength = bufferTarget(bytes / duration, window.innerWidth < 760);
     });
 
     hls.on(Hls.Events.ERROR, (_evt, data) => {
@@ -312,12 +317,12 @@ export function PlayerShell({
     lastPrefetchEnsureRef.current = 0;
     recoveryRef.current = new PlaybackRecovery();
     // 换集时清掉上一集的预取窗口，避免带宽被旧集占用
-    getVideoPrefetcher().stop();
+    getVideoPrefetcher().stop(); getNextEpisodePrefetcher().stop();
     setError('');
     setShowPoster(true);
     const art = artRef.current;
     if (!art) return;
-    setupHls(art.video, targetUrl, true);
+    setupHls(art.video, targetUrl, /^https?:\/\//.test(targetUrl));
   };
 
   // —— 创建播放器（仅一次，挂载即创建） ——
@@ -388,7 +393,7 @@ export function PlayerShell({
       ],
       customType: {
         m3u8: (video: HTMLVideoElement, mediaUrl: string) => {
-          setupHls(video, mediaUrl, true);
+          setupHls(video, mediaUrl, /^https?:\/\//.test(mediaUrl));
         },
       },
     });
@@ -464,10 +469,10 @@ export function PlayerShell({
     });
     art.on('video:waiting', () => {
       // 卡顿：预取临时让出带宽给播放
-      getVideoPrefetcher().setThrottled(true);
+      getVideoPrefetcher().setThrottled(true); getNextEpisodePrefetcher().setThrottled(true);
     });
     art.on('video:playing', () => {
-      getVideoPrefetcher().setThrottled(false);
+      getVideoPrefetcher().setThrottled(bufferedAhead(art.video) < 45);
     });
     art.on('video:ended', () => {
       endedRef.current = true;
@@ -605,7 +610,7 @@ export function PlayerShell({
       hlsRef.current?.destroy();
       hlsRef.current = null;
       recoveryRef.current?.dispose();
-      getVideoPrefetcher().stop();
+      getVideoPrefetcher().stop(); getNextEpisodePrefetcher().stop();
       art.destroy();
       artRef.current = null;
     };
@@ -626,6 +631,8 @@ export function PlayerShell({
       style: { opacity: hasNextEpisode ? '1' : '0.4', pointerEvents: hasNextEpisode ? 'auto' : 'none' },
     });
   }, [hasPrevEpisode, hasNextEpisode, url]);
+
+  useEffect(() => { const apply = () => { const hls = hlsRef.current; if (hls) { hls.config.capLevelOnFPSDrop = playbackMode() === 'smooth'; if (playbackMode() === 'smooth') hls.currentLevel = -1; } }; window.addEventListener('playback-mode-changed', apply); return () => window.removeEventListener('playback-mode-changed', apply); }, []);
 
   // —— 换集：仅切换 HLS 源，不重建播放器（保留网页全屏等状态） ——
   const firstUrlRef = useRef(true);
@@ -674,6 +681,7 @@ export function PlayerShell({
           {hint}
         </div>
       )}
+      <div className="absolute top-2 right-2 z-20 max-w-[90%] bg-black/70 rounded-lg px-2"><PlaybackDiagnostics container={containerRef} /></div>
       {autoplayNext && !error && (
         <div className="absolute bottom-16 right-3 text-[10px] text-muted bg-black/50 px-2 py-0.5 rounded pointer-events-none">
           自动连播已开启

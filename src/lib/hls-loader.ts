@@ -69,7 +69,9 @@ export function createHlsLoader(
 
         // —— 片段：cache-first ——
         const key = buildSegmentCacheKey(context.url);
+        let startedNetwork = false; const network = () => { if (!startedNetwork && !this.destroyed) { startedNetwork = true; load(context, config, callbacks); } }; const timer = setTimeout(network, 120);
         readCachedSegment(key).then((hit) => {
+          clearTimeout(timer); if (startedNetwork) return;
           if (this.destroyed) return;
           if (hit) {
             void touchMeta(key);
@@ -90,8 +92,8 @@ export function createHlsLoader(
           callbacks.onSuccess = (response: any, stats: any, ctx: any, networkDetails: any) => {
             if (!this.destroyed) onSuccess(response, stats, ctx, networkDetails);
           };
-          load(context, config, callbacks);
-        });
+          network();
+        }).catch(() => { clearTimeout(timer); network(); });
       };
     }
 

@@ -24,6 +24,7 @@ describe('doubanWeeklyToItem', () => {
     );
     // 原生 doubanio 地址命中图片代理白名单并带 Referer 伪装，优先于 cover_proxy 镜像
     expect(item).toEqual({
+      provider: 'douban', providerId: '36808876', year: undefined, synopsis: undefined, area: undefined, genre: undefined, actors: undefined, directors: undefined,
       id: '36808876',
       title: '奥德赛',
       cover: 'https://img9.doubanio.com/view/photo/p1.jpg',
@@ -51,13 +52,19 @@ describe('doubanWeeklyToItem', () => {
 });
 
 describe('baiduTeleplayToItem', () => {
-  it('用序号生成 id，不输出 rating', () => {
+  it('使用稳定名称标识，不输出热度为评分', () => {
     expect(baiduTeleplayToItem({ title: '某剧', cover: 'https://img.example/1.jpg' }, 3)).toEqual({
-      id: 'baidu_3',
+      id: 'baidu_某剧:', provider: 'baidu', providerId: '某剧:', synopsis: undefined,
       title: '某剧',
       cover: 'https://img.example/1.jpg',
       isTv: true,
     });
+  });
+
+  it('榜单排名变化时保持百科 ID，避免收藏串片', () => {
+    const raw = { title: '九门', cover: 'https://img.example/a.jpg', url: 'https://baike.baidu.com/item/name/64883150?fr=resou' };
+    expect(baiduTeleplayToItem(raw, 1)?.id).toBe('baidu_64883150');
+    expect(baiduTeleplayToItem(raw, 9)?.id).toBe(baiduTeleplayToItem(raw, 1)?.id);
   });
 
   it('无海报条目丢弃', () => {

@@ -20,6 +20,13 @@ export function isPasswordConfigured(): boolean {
   return getPassword().length > 0;
 }
 
+/** Preserve the deployment's HTTPS/COOKIE_SECURE policy for every private cookie. */
+export function cookieIsSecure(req: Request): boolean {
+  return process.env.COOKIE_SECURE === 'true' ? true
+    : process.env.COOKIE_SECURE === 'false' ? false
+    : (req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? 'http') === 'https';
+}
+
 function getSecret(): string {
   if (process.env.PROXY_SECRET) return process.env.PROXY_SECRET;
   return crypto.createHash('sha256').update(getPassword() + ':libretv::session-salt').digest('hex');
