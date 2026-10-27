@@ -65,7 +65,7 @@ export async function ensureDiskSpace(required: number, adapter: CleanupAdapter,
   if (required > quota.total) throw new PanError(`该文件约 ${(required / 1024 ** 3).toFixed(1)} GiB，超过网盘总容量 ${(quota.total / 1024 ** 3).toFixed(1)} GiB，清理也无法放入，请换较小版本`, 409, 'FILE_EXCEEDS_CAPACITY');
   if (quota.free >= required) return { deleted: 0, quota };
   if (!autoCleanupEnabled(adapter.provider, adapter.account)) throw new PanError('网盘空间不足，当前账号未开启自动清理，可在网盘连接管理中设置', 409, 'CAPACITY');
-  progress?.({ stage: 'cleaning', message: '空间不足，正在清理网盘旧资源和回收站', deleted: 0 });
+  progress?.({ stage: 'cleaning', message: '空间不足，正在清理网盘旧资源', deleted: 0 });
   const candidates = await adapter.candidates(); let deleted = 0;
   const unique = [...new Map(candidates.map((e) => [(e.drive || '') + ':' + e.id, e])).values()].sort((a, b) => a.priority - b.priority || a.modified - b.modified);
   for (const entry of unique.slice(0, 200)) {

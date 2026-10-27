@@ -15,7 +15,7 @@ export function seekPosition(current: number, delta: number, duration: number) {
   return Math.min(Math.max(0, (Number.isFinite(current) ? current : 0) + delta), Math.max(0, duration - 0.1));
 }
 export function proxyFallbackUrl(raw: string) {
-  try { const origin = typeof location === 'undefined' ? 'https://cinema.test' : location.origin; const url = new URL(raw, origin); if (url.origin !== origin || !/^\/api\/(?:alipan|netdisk)\/media$/.test(url.pathname) || url.searchParams.get('direct') !== '1') return null; url.searchParams.set('direct', '0'); return url.href; } catch { return null; }
+  try { const origin = typeof location === 'undefined' ? 'https://cinema.test' : location.origin; const url = new URL(raw, origin); if (url.origin !== origin || !/^\/api\/(?:alipan|netdisk|resources)\/media$/.test(url.pathname) || url.searchParams.get('direct') !== '1') return null; url.searchParams.set('direct', '0'); return url.href; } catch { return null; }
 }
 export function directFallbackLoader(Base: new(config: HlsConfig) => Loader<LoaderContext>) {
   return class implements Loader<LoaderContext> {

@@ -44,13 +44,14 @@ function requireSuccess(data: Record<string, unknown>, status: number) {
   if ([41031, 41012].includes(code) || /取消了分享|分享者.*封禁/.test(String(data.message))) throw new PanError('该分享已失效或被夸克限制，请换一个资源', 410, 'SHARE_UNAVAILABLE');
   // Quark's own share client defines 41020 as FID_TOKEN_EXPIRED and 41016 as STOKEN_EXPIRED.
   if ([41016, 41020].includes(code)) throw new PanError('分享文件的访问凭证已过期，请重新打开目录后播放', 409, 'SHARE_TOKEN_EXPIRED');
+  if (code === 15000) throw new PanError('夸克服务暂忙，本次操作尚未确认完成，请稍后重试或在夸克 App 查看', 503, 'QUARK_BUSY');
   if ([41007, 41008].includes(code)) throw new PanError('分享需要正确的提取码', 409, 'PASSCODE_REQUIRED');
   if (/提取码|密码/.test(String(data.message))) throw new PanError('分享需要正确的提取码', 409, 'PASSCODE_REQUIRED');
   if (/空间|容量/.test(String(data.message))) throw new PanError('夸克网盘空间不足，请先整理空间', 409, 'CAPACITY');
   if (/会员|权益|权限/.test(String(data.message))) throw new PanError('当前账号暂不支持这条播放线路，可尝试其他画质或在夸克中打开', 403, 'ACCOUNT_LIMIT');
   throw new PanError(`夸克暂未完成请求（状态 ${Number.isFinite(code) ? code : status}），请稍后重试`, 502);
 }
-async function drive(path: string, value?: QuarkAccount, body?: object, query: Record<string, string> = {}) {
+async function drive(path: string, value?: QuarkAccount, body?: object, query: Record<string, string> = {}, retry = 0): Promise<Record<string, unknown> | Record<string, unknown>[]> {
   if (value) {
     const current = quarkVault().read();
     if (!current || current.id !== value.id) throw new PanError('夸克连接已更改，请刷新后重试', 409);
@@ -64,6 +65,8 @@ async function drive(path: string, value?: QuarkAccount, body?: object, query: R
     current.cookie = mergeCookies(current.cookie, result.setCookies);
     quarkVault().write(current, current.id); value.cookie = current.cookie;
   }
+  // Only idempotent reads may be retried automatically; never replay a cloud mutation.
+  if ((!body || ['share/sharepage/token', 'file/v2/play', 'file/download'].includes(path)) && Number(result.data.code) === 15000 && retry === 0) { await new Promise((r) => setTimeout(r, 500)); return drive(path, value, body, query, retry + 1); }
   try { requireSuccess(result.data, result.status); }
   catch (e) { console.warn('[quark] request rejected', { phase: path, status: result.status, code: Number(result.data.code) || 0 }); throw e; }
   const data = result.data.data;
@@ -227,15 +230,22 @@ export function quarkStorageAdapter(value = account()): CleanupAdapter {
       const out: CleanupEntry[] = [], roots = await list();
       const add = (rows: Record<string, unknown>[], parent: string, priority: number, recycle = false) => { for (const v of rows) if (v.fid && v.fid !== value.folder) out.push({ id: idValue(v.fid), parent, size: Number(v.size) || 0, modified: Number(v.updated_at || v.created_at) || 0, priority, recycle, record: textRecord(v.record_id) }); };
       if (value.folder && roots.some((v) => v.fid === value.folder)) add(await list(value.folder), value.folder, 1);
-      add(roots, '0', 2); add(await list('0', true), '0', 0, true); return out;
+      // Quark excludes recycled files from use_capacity. Purging existing trash cannot
+      // make room here and can fail with 15000 for large items; reclaim live files first.
+      add(roots, '0', 2); return out;
     },
     remove: async (entry) => {
       if (storageProtected('quark', value.id, entry.id)) throw new PanError('该文件正在播放，已保留', 409, 'FILE_ACTIVE');
       let record = entry.record;
-      if (!entry.recycle) { const deleted = await drive('file/delete', value, { action_type: 2, filelist: [idValue(entry.id)], exclude_fids: [] }) as Record<string, unknown>; await waitTask(deleted); record = textRecord((await list('0', true)).find((v) => v.fid === entry.id)?.record_id); }
+      if (!entry.recycle) { const deleted = await drive('file/delete', value, { action_type: 2, filelist: [idValue(entry.id)], exclude_fids: [] }) as Record<string, unknown>; await waitTask(deleted); }
       const latest = account(); if (latest.id !== value.id) throw new PanError('网盘账号已更改', 409);
       for (const [key, fid] of Object.entries(latest.saved)) if (fid === entry.id) delete latest.saved[key]; quarkVault().write(latest, latest.id); value.saved = latest.saved;
-      if (record) await waitTask(await drive('file/recycle/remove', value, { select_mode: 2, record_list: [idValue(record)] }) as Record<string, unknown>);
+      // ensureDiskSpace rechecks the quota before selecting another item. Moving to
+      // trash is sufficient on Quark; never turn a successful reclaim into a failed play.
+      if (entry.recycle && record) {
+        try { await waitTask(await drive('file/recycle/remove', value, { select_mode: 2, record_list: [idValue(record)] }) as Record<string, unknown>); }
+        catch { record = textRecord((await list('0', true)).find((v) => v.fid === entry.id)?.record_id); if (record) throw new PanError('夸克回收站暂未完成清理，已停止后续删除；可在夸克 App 处理后重试', 409, 'CLEANUP_PENDING'); }
+      }
     },
   };
 }

@@ -39,6 +39,17 @@ describe('netdisk input and source parsing', () => {
     expect(mergeCookies('__pus=old; other=stable', ['__pus=new; Path=/; HttpOnly'])).toBe('__pus=new; other=stable');
   });
 });
+
+describe('Quark transient rejection policy', () => {
+  it('retries a 15000 read once and refreshes share browsing', async () => { connect(); let reads = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => { if (input.includes('sharepage/token')) { reads++; return reads === 1 ? new Response(JSON.stringify({ code: 15000 }), { status: 500 }) : ok({ stoken: 'token' }); } return ok({ list: [] }); }));
+    await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789'); expect(reads).toBe(2);
+  });
+  it('does not replay a rejected 15000 save or lose its uncertain transfer marker', async () => { connect(); let writes = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => { if (input.includes('sharepage/token')) return ok({ stoken: 'token' }); if (input.includes('sharepage/detail')) return ok({ list: [{ fid: 'v1', file_name: 'v.mp4', file_type: 1, share_fid_token: 'fresh' }] }); if (input.includes('file/sort')) return ok({ list: [{ fid: 'folder1', file_name: 'JjBiTV 追剧', file_type: 0 }] }); if (input.includes('sharepage/save')) { writes++; return new Response(JSON.stringify({ code: 15000 }), { status: 500 }); } throw new Error('Unexpected endpoint'); }));
+    const listing = await listQuarkShare(req(), 'https://pan.quark.cn/s/abc123456789'); await expect(playQuarkFile(req(), listing.items[0].key)).rejects.toMatchObject({ code: 'QUARK_BUSY' }); expect(writes).toBe(1); expect(quarkVault().read()?.tasks?.['abc123456789:v1']).toBe('uncertain');
+  });
+});
 describe('Quark account, share and streaming', () => {
   it('refreshes an anonymous file token for the current account and retries one explicit 41020 rejection', async () => {
     let listings = 0; let saves = 0; const submitted: string[] = [];

@@ -7,7 +7,7 @@ import { directFallbackLoader, seekPosition } from '@/lib/pan-player-utils';
 import { ViewingControls } from './viewing-controls';
 export function preloadPanPlayer() { void import('artplayer').catch(() => {}); void import('hls.js').catch(() => {}); }
 
-interface Props { quality: PanQuality; title: string; identity: string; saved: boolean; limited?: boolean; provider?: 'quark' | 'aliyun'; notice?: string; lease?: string; nextRequiresSave?: boolean; onNext?: (automatic?: boolean) => void; onRefresh: () => void; onStall?: () => boolean }
+interface Props { quality: PanQuality; title: string; identity: string; saved: boolean; limited?: boolean; provider?: 'quark' | 'aliyun'; notice?: string; lease?: string; nextRequiresSave?: boolean; preferHighest?: boolean; onNext?: (automatic?: boolean) => void; onRefresh: () => void; onStall?: () => boolean }
 const skipIcon = (forward: boolean) => `<button type="button" aria-label="${forward ? '快进' : '后退'}10秒" style="color:inherit;background:transparent;border:0;padding:0;width:28px;height:28px;cursor:pointer"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="${forward ? 'M17 3v5h-5M17 8a8 8 0 1 0 3 6' : 'M7 3v5h5M7 8a8 8 0 1 1-3 6'}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><text x="12" y="17" text-anchor="middle" fill="currentColor" font-size="9" font-family="Arial">10</text></svg></button>`;
 export function NetdiskPlayer(props: Props) {
   const { quality, title, identity, lease, onNext, onRefresh } = props;
@@ -54,6 +54,7 @@ export function NetdiskPlayer(props: Props) {
             const Hls = hlsModule.default;
             hls = new Hls({ enableWorker: true, lowLatencyMode: false, maxBufferLength: 60, maxMaxBufferLength: 120, backBufferLength: 20, maxBufferSize: 48 * 1024 * 1024, loader: directFallbackLoader(hlsModule.FetchLoader), fetchSetup: (context, init) => new Request(context.url, { ...init, credentials: 'same-origin', referrerPolicy: 'no-referrer' }) });
             hls.loadSource(url); hls.attachMedia(video); let networkRetries = 0, mediaRetries = 0;
+            if (latest.current.preferHighest) hls.on(Hls.Events.MANIFEST_PARSED, () => { if (!hls || !hls.levels.length) return; const best = hls.levels.reduce((index, level, i, levels) => level.width * level.height > levels[index].width * levels[index].height ? i : index, 0); hls.currentLevel = best; });
             hls.on(Hls.Events.ERROR, (_, data) => { if (!data.fatal || disposed) return; if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries++ < 2) { hls?.startLoad(video.currentTime); return; } if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRetries++ < 1) { hls?.recoverMediaError(); return; } setError('播放线路暂时不稳定，可以切换流畅画质或刷新地址'); recover(); });
           } else if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = url;
           else setError('当前浏览器不支持这条视频线路，请更换浏览器或选择其他线路');

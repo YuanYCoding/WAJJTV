@@ -3,11 +3,11 @@
 ## 当前部署
 
 - 基线：LibreTV 2.16.12，原容器 `libretv`，`127.0.0.1:18080`。
-- 当前新版：目录验证、准备状态流与原画备选 `2.19.7-jjbitv.9`，镜像 `jjbitv:v9-20261027`，容器 `jjbitv-v9`，`127.0.0.1:18092`。
-- 本次回滚目标：JjBiTV v8，镜像 `jjbitv:v8-20261026`，容器 `jjbitv-v8`，`127.0.0.1:18091`。更早 v7 / v6 / v5 / v4、WAJJTV v3 / v2 继续保留。
+- 当前新版：夸克容量恢复与独立 HLS 高清检索 `2.19.7-jjbitv.10`，镜像 `jjbitv:v10-20261027`，容器 `jjbitv-v10`，`127.0.0.1:18093`。
+- 本次回滚目标：JjBiTV v9，镜像 `jjbitv:v9-20261027`，容器 `jjbitv-v9`，`127.0.0.1:18092`。更早 v8 / v7 / v6 / v5 / v4、WAJJTV v3 / v2 继续保留。
 - 更早 WAJJTV v1：容器 `wajjtv`，`127.0.0.1:18081`，继续保留。
 - 域名：`https://zhuiju.zhaxueit.cn/`，由 Nginx 转发；保留流式响应的 `proxy_buffering off`。
-- 新配置：`/opt/jjbitv-v9-20261027/.env`。沿用访问密码、`SITE_ORIGIN`、独立的 `CLOUD_ENCRYPTION_KEY` 以及 `PAN_AUTO_CLEANUP=1`、`PAN_DIRECT_MEDIA=1`，不要提交私密配置到仓库。
+- 新配置：`/opt/jjbitv-v10-20261027/.env`。沿用访问密码、`SITE_ORIGIN`、独立的 `CLOUD_ENCRYPTION_KEY` 以及 `PAN_AUTO_CLEANUP=1`、`PAN_DIRECT_MEDIA=1`，不要提交私密配置到仓库。
 - 私人插画：`/opt/wajjtv-v2/private/mascots.png`，只读挂载到 `/app/private`，需登录访问 `/api/couple-art`。
 - 健康状态、旧片单数据库与夸克加密凭证：`/opt/jjbitv-20261024/data` 挂载到 `/app/data`，容器用户 UID/GID 1001 需要写权限。
 - 历史记录与偏好沿用原 IndexedDB / localStorage 名称，保留原有用户数据兼容性。
@@ -17,14 +17,14 @@
 在服务器执行：
 
 ```sh
-sh /opt/jjbitv-v9-20261027/rollback.sh
+sh /opt/jjbitv-v10-20261027/rollback.sh
 ```
 
-该脚本启动保留的 JjBiTV v8 容器，确认就绪后恢复 Nginx 至 18091，并停止 v9。现有数据目录、两种网盘凭证与清理授权保留。回滚应用不能恢复此前已经永久清理的云端文件；外部地址和准备状态包含内存票据，切换或重启后需要重新准备。
+该脚本启动保留的 JjBiTV v9 容器，确认就绪后恢复 Nginx 至 18092，并停止 v10。现有数据目录、两种网盘凭证与清理授权保留。回滚应用不能恢复此前已经永久清理的云端文件；外部地址和准备状态包含内存票据，切换或重启后需要重新准备。
 
-本次备份：`/opt/backups/jjbitv-v8-before-discovery-20261027-095555`，含运行镜像、源码、配置、SQLite 一致性快照、数据和素材。SHA256 与数据库完整性检查已通过；切换前另存 `precutover-*.sqlite`、两个网盘凭证与清理授权快照。原 v7 备份 `/opt/backups/jjbitv-v7-before-playback-20261026-193153`、v6 备份 `/opt/backups/jjbitv-v6-before-pan-expansion-20261026-163025`、v5 / v4 备份继续保留。
+本次备份：`/opt/backups/jjbitv-v9-before-uhd-20261027-144637`，含运行镜像、源码、配置、SQLite 一致性快照、数据和素材。SHA256 与数据库完整性检查已通过；切换前另存 `precutover-*.sqlite`、两个网盘凭证与清理授权快照。原 v8 备份 `/opt/backups/jjbitv-v8-before-discovery-20261027-095555`、v7 备份 `/opt/backups/jjbitv-v7-before-playback-20261026-193153`、v6 备份 `/opt/backups/jjbitv-v6-before-pan-expansion-20261026-163025`、v5 / v4 备份继续保留。
 
-预发布在 18092 使用独立 `preview-data`；正式运行挂载既有 `/opt/jjbitv-20261024/data`。切换时只合并同一连接经过验证的较新凭证字段，保留生产转存映射、任务与原有清理授权，不整体覆盖账号。网盘凭证分别位于 `quark-credentials.enc`、`alipan-credentials.enc`，清理授权和播放租约分别为 `netdisk-cleanup-policy.json`、`netdisk-leases.json`，需连同 `.env` 中 `CLOUD_ENCRYPTION_KEY` 备份，不能只复制数据库。日志只输出接口路径、HTTP 状态和业务码，不输出 Cookie、文件凭证或签名地址。
+预发布在 18093 使用独立 `preview-data`；正式运行挂载既有 `/opt/jjbitv-20261024/data`。切换时只合并同一连接经过验证的较新凭证字段，保留生产转存映射、任务与原有清理授权，不整体覆盖账号。网盘凭证分别位于 `quark-credentials.enc`、`alipan-credentials.enc`，清理授权和播放租约分别为 `netdisk-cleanup-policy.json`、`netdisk-leases.json`，需连同 `.env` 中 `CLOUD_ENCRYPTION_KEY` 备份，不能只复制数据库。日志只输出接口路径、HTTP 状态和业务码，不输出 Cookie、文件凭证或签名地址。
 
 保留的旧备份：`/opt/backups/wajjtv-v2-before-sources-20261023-191103`、`/opt/backups/wajjtv-v1-before-v2-20261021-194353`、`/opt/backups/wajjtv-before-20261021-171816`。备份含私密配置，不上传公共仓库。
 
@@ -68,3 +68,15 @@ npm run build
 ## V9 验收
 
 53 个测试文件、596 项测试通过，TypeScript、ESLint 与 Linux Node 22 生产构建通过。低配 Linux 构建使用单 worker，测试单项超时预算 20 秒，应用接口本身的超时保持独立。目录验证真实搜索、两种网盘准备弹窗、其他资源实际播放、标签零重搜、返回恢复结果/筛选/位置，以及手机布局均有浏览器验收。未为本轮验收删除原有影片或新增大文件转存。参见 [V9 功能、证据与边界](netdisk-v9.md)。
+
+## V10 HLS 检索与夸克 15000
+
+`/resources` 不再调用普通 `/api/search`，也不提供磁力检索。独立查询芒果资源站、光速、暴风、豪华、虎牙、金鹰、极速、红牛的公开目录，提取真正的 m3u8 地址。目录仍用于片名索引，是否展示由媒体检测决定。读取清单、最高档位与中间分片，支持 H.264 / HEVC SPS、fMP4 初始化段及普通 AES-128 分片；不按片名或码率推断 4K，不处理需要授权播放器的 DRM。
+
+默认展示 1080P 及以上、结束清单且至少 10 分钟的线路，不代表已经人工看完整部影片。宽银幕按实际尺寸分档（如 1920×800、3840×1600），始终保留数值与“分片检测／清单声明”的区别。4K 片名被实测为 1080 时明确提示；播放器再次显示解码尺寸。未找到真 4K 时为空，不制造 4K 结果。
+
+HLS 检索总预算 40 秒，最多 24 条候选、每目录最多 4 条，检测全进程并发 3；同时最多 3 个检索请求。结果找到即流式返回，成功缓存 5 分钟，空结果 30 秒。筛选不重新请求；支持粘贴公网 m3u8 检测并播放。媒体接口要求站点登录，逐跳验证公网目标；不转发站点或网盘凭证。CDN 通过实际 CORS 探测时分片直连，失败自动中转，也可手动选择中转。中转受服务器出口带宽限制。
+
+线上 v9 的 15000 日志定位为 `file/recycle/remove`（HTTP 500）。当前账号容量不包括回收站：因此清理旧文件移入回收站、等待异步任务后，让容量检查决定是否继续，不再强制永久删除现有回收站条目。若容量未更新，则停止，保留正在播放的资源。15000 的幂等读取最多重试一次；删除、转存等写操作不自动重放，未知转存结果保留待确认标记。
+
+源码保留原有网盘及 41 个部署者普通源配置；本次未增加任何账号权限或绕过平台画质限制。公开电影源有虚标，播放器支持 4K 不等于每部片有可用 4K。上线流程仍是独立数据预发布、真实浏览器验证、再次快照、切换 Nginx；验证记录保存在服务器 `/opt/wajjtv-audit`，不含 Cookie 或原始签名播放地址。
