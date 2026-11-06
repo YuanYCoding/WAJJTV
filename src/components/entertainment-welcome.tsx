@@ -1,0 +1,5 @@
+import Link from 'next/link';
+import { CoupleMascots } from './couple-mascots';
+export function EntertainmentWelcome() {
+  return <><section className="entertainment-hero"><div className="entertainment-copy"><h1>把喜欢的时光，<br />留给我们。</h1><p>海清和静静的私人影音空间</p><span className="music-sage-line" aria-hidden="true" /></div><CoupleMascots /></section><nav className="entertainment-doors" aria-label="选择娱乐方式"><Link href="/#films" className="entertainment-door" aria-label="进入观影"><span><strong>观影</strong><span className="door-action" aria-hidden="true">↗</span></span><svg className="film-reel" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="45" fill="currentColor" /><circle cx="50" cy="50" r="7" fill="#101111" />{[[50,22],[77,41],[67,73],[33,73],[23,41]].map(([cx,cy]) => <circle key={cx} cx={cx} cy={cy} r="12" fill="#101111" />)}</svg></Link><Link href="/music" className="entertainment-door" aria-label="进入听歌"><span><strong>听歌</strong><span className="door-action" aria-hidden="true">↗</span></span><span className="door-vinyl" aria-hidden="true" /></Link></nav></>;
+}

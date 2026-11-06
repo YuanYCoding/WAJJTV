@@ -1,4 +1,5 @@
 'use client';
+import { api } from '@/lib/client-api';
 
 import { useCallback, useState, type ReactNode } from 'react';
 import { cn, formatDisableTtl } from '@/lib/utils';
@@ -240,7 +241,7 @@ export function HealthBadge({ sourceKey }: { sourceKey: string }) {
   if (!entry) return null;
 
   const permanent = entry.permanent === true;
-  const disabled = permanent || (!!entry.disabledUntil && entry.disabledUntil > Date.now());
+  const disabled = entry.unavailable || permanent || !!entry.disabledUntil;
   if (disabled) {
     // 长期停用（阶梯用尽）没有到期时间，展示为红色并提示需手动恢复
     const remainText = formatDisableTtl((entry.disabledUntil ?? 0) - Date.now());
@@ -254,22 +255,28 @@ export function HealthBadge({ sourceKey }: { sourceKey: string }) {
           title={
             permanent
               ? `已第 ${entry.disableCount} 次被自动停用，暂停参与搜索；点「恢复」重新启用`
-              : `连续 ${entry.failStreak} 次超时/失败，${remainText}后自动恢复`
+              : `连续 ${entry.failStreak} 次超时/失败，${remainText}后复检，成功后恢复`
           }
         >
           <Icon name="clock" className="w-3 h-3" />
-          {permanent ? '已停用' : remainText}
+          {(entry.disabledUntil ?? 0) <= Date.now() ? '等待复检' : `暂时失效 · ${remainText}后复检`}
         </span>
         <button
           className="text-[10px] px-1.5 py-0.5 rounded text-muted hover:text-accent hover:bg-hover transition-colors"
-          aria-label="恢复此源"
-          title="清除健康度记录，立即恢复参与搜索"
-          onClick={() => {
-            useAppStore.getState().clearSourceHealth(sourceKey);
-            toast('已恢复，下次搜索重新参与', 'success');
+          aria-label="复检此源"
+          title="检查接口，成功后才恢复参与搜索"
+          onClick={async () => {
+            const state = useAppStore.getState();
+            const source = [...state.envSources, ...state.customAPIs].find((s) => s.key === sourceKey);
+            if (!source) return;
+            try {
+              const r = await api.testSource(source.url);
+              state.recordSourceHealth([{ sourceKey, ok: r.ok, ms: r.ms, error: r.error, list: [] }]);
+              toast(r.ok ? '复检通过，已恢复' : '暂时仍不可用，将继续自动复检', r.ok ? 'success' : 'info');
+            } catch { toast('复检请求失败，请稍后再试', 'warning'); }
           }}
         >
-          恢复
+          复检
         </button>
       </span>
     );

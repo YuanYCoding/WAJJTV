@@ -12,6 +12,9 @@ tsconfig.tsbuildinfo
 # 本地环境与日志
 .env
 .env*.local
+private
+data
+.qa
 *.log
 
 # 文档与编排文件（不参与镜像构建）

@@ -1,5 +1,7 @@
 import type { DoubanItem } from './types';
 import { fetchUpstream, getCache, setCache } from './fetch-utils';
+import { titleIdentity } from './library-types';
+import { curatedMatch } from './curated-films';
 
 /**
  * 影视热榜聚合（经 60s API，免 key，https://github.com/vikiboss/60s）。
@@ -50,11 +52,16 @@ interface DoubanWeeklyRaw {
   rating?: number;
   cover_proxy?: string;
   cover?: string;
+  year?: number | string;
+  description?: string;
+  card_subtitle?: string;
 }
 
 interface BaiduTeleplayRaw {
   title?: string;
   cover?: string | null;
+  url?: string;
+  desc?: string;
 }
 
 interface SixtyResponse<T> {
@@ -68,7 +75,12 @@ export function doubanWeeklyToItem(raw: DoubanWeeklyRaw, isTv: boolean): DoubanI
   // 可稳定加载；cover_proxy（doubanio.viki.moe 公共镜像）限流严重，仅作兜底
   const cover = raw.cover || raw.cover_proxy;
   if (!raw.id || !raw.title || !cover) return undefined;
+  const parts = raw.card_subtitle?.split('/').map((s) => s.trim()) || [];
+  const year = raw.year ? String(raw.year) : /^\d{4}$/.test(parts[0] || '') ? parts[0] : undefined;
+  if (curatedMatch({ provider: 'douban', providerId: String(raw.id), title: raw.title, year, kind: isTv ? 'tv' : 'movie' })) return undefined;
   return {
+    provider: 'douban', providerId: String(raw.id), year, synopsis: raw.description,
+    area: parts[1], genre: parts[2], directors: parts[3]?.split(/\s+/), actors: parts[4]?.split(/\s+/),
     id: String(raw.id),
     title: raw.title,
     cover,
@@ -78,11 +90,14 @@ export function doubanWeeklyToItem(raw: DoubanWeeklyRaw, isTv: boolean): DoubanI
 }
 
 /** 百度热播剧条目 → DoubanItem；无评分，海报为空的条目丢弃 */
-export function baiduTeleplayToItem(raw: BaiduTeleplayRaw, index: number): DoubanItem | undefined {
+export function baiduTeleplayToItem(raw: BaiduTeleplayRaw, _index: number): DoubanItem | undefined {
   if (!raw.title || !raw.cover) return undefined;
+  void _index; // Ranking position is deliberately excluded from the persistent identity.
+  let stable = titleIdentity(raw.title);
+  try { if (raw.url) stable = new URL(raw.url).pathname.match(/\/(\d+)\/?$/)?.[1] || stable; } catch { /* Stable title fallback. */ }
   return {
-    // 百度榜无稳定 id，用榜单内序号保证 React key 唯一
-    id: `baidu_${index}`,
+    provider: 'baidu', providerId: stable, synopsis: raw.desc,
+    id: `baidu_${stable}`,
     title: raw.title,
     cover: raw.cover,
     isTv: true,

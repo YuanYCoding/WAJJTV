@@ -96,8 +96,8 @@ export async function handleProxyRequest(req: Request, targetUrl: string): Promi
     try {
       const result = await fetchWithSafeRedirects(targetUrl, {
         headers,
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
+        signal: req.signal,
+      }, { headerTimeoutMs: TIMEOUT_MS });
       response = result.res;
       finalUrl = result.finalUrl;
       lastError = null;

@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { api } from '@/lib/client-api';
 import type { SourceConfig, SearchResultItem } from '@/lib/types';
 import { buildWatchUrl, cn } from '@/lib/utils';
-import { useAppStore, resolveSource } from '@/lib/store';
+import { useAppStore, resolveSource, isSourceDisabled, isInDisabledSubscription } from '@/lib/store';
+import { normalizeTitle } from '@/lib/cms-parser';
+import { sourceIdentity } from '@/lib/source-health';
 import { qualityKey, qualityLabel } from '@/lib/quality';
 import { useToast } from './toast';
 import { Icon } from './icon';
@@ -75,9 +77,13 @@ export function SwitchSourceModal({
     const seen = new Set<string>();
     return store.selectedKeys
       .map((key) => resolveSource(store, key))
+      .sort((a, b) => {
+        const x = store.sourceHealth[a?.key || '']; const y = store.sourceHealth[b?.key || ''];
+        return (x?.ok ? x.ms ?? 1e9 : 1e9) - (y?.ok ? y.ms ?? 1e9 : 1e9);
+      })
       .filter((s): s is SourceConfig => {
-        if (!s || seen.has(s.key)) return false;
-        seen.add(s.key);
+        if (!s || isSourceDisabled(store, s.key) || isInDisabledSubscription(store, s.key) || seen.has(sourceIdentity(s.url))) return false;
+        seen.add(sourceIdentity(s.url));
         return true;
       });
   }, [store]);
@@ -107,37 +113,49 @@ export function SwitchSourceModal({
     (async () => {
       // 1) 并行搜索所有选中源
       setPhase('searching');
-      try {
-        const { list } = await api.search(currentTitle, sources, store.yellowFilter, { signal: controller.signal });
-        if (cancelled) return;
-
-        // 匹配口径：优先完全同名，其次名称以标题开头（兼容「小偷 HD」「小偷[电影解说]」这类修饰名）。
-        // 都没有则不展示该源——不再兜底取搜索第一条，避免把搜到的其他影片（如搜「小偷」
-        // 命中的《宝贝 小偷与大盗》）误当成换源目标。
-        const title = currentTitle.trim();
-        const matched: Candidate[] = [];
-        for (const s of sources) {
-          const hits = list.filter((r) => r.sourceKey === s.key);
-          const exact =
-            hits.find((r) => (r.name || '').trim() === title) ??
-            hits.find((r) => (r.name || '').trim().startsWith(title));
-          if (exact) matched.push({ source: s, result: exact });
+      setCandidates([]);
+      const discovered = new Set<string>();
+      const pending: Promise<void>[] = [];
+      const queue: Candidate[] = [];
+      let active = 0;
+      const pump = () => {
+        while (!cancelled && active < 3 && queue.length) {
+          const c = queue.shift()!;
+          active++;
+          const job = api.detailSpeed(c.result.vodId, c.source, controller.signal).then((r) => {
+            if (!cancelled) setCandidates((prev) => prev.map((item) => candidateKey(item) === candidateKey(c)
+              ? { ...item, ok: r.ok, ms: r.ms, episodes: r.detail?.episodes.length ?? 0, error: r.ok ? undefined : r.error }
+              : item));
+          }).catch(() => {
+            if (!cancelled) setCandidates((prev) => prev.map((item) => candidateKey(item) === candidateKey(c) ? { ...item, ok: false, error: '读取线路失败，可重试' } : item));
+          }).finally(() => { active--; pump(); });
+          pending.push(job);
         }
-
-        // 2) 并发测速（详情接口耗时）并获取集数
-        setPhase('testing');
-        await Promise.all(
-          matched.map(async (c) => {
-            const r = await api.detailSpeed(c.result.vodId, c.source, controller.signal);
-            if (cancelled) return;
-            c.ok = r.ok;
-            c.ms = r.ms;
-            c.episodes = r.detail?.episodes.length ?? 0;
-            c.error = r.ok ? undefined : r.error;
-          })
-        );
+      };
+      const accept = (list: SearchResultItem[]) => {
+        for (const s of sources) {
+          if (discovered.has(s.key)) continue;
+          // 不把电影解说、续作等前缀相同的影片误当成可替换线路。
+          const exact = list.find((r) => r.sourceKey === s.key && normalizeTitle(r.name || '') === normalizeTitle(currentTitle));
+          if (!exact) continue;
+          discovered.add(s.key);
+          const c: Candidate = { source: s, result: exact };
+          setCandidates((prev) => [...prev, c]);
+          queue.push(c);
+        }
+        pump();
+      };
+      try {
+        const { list } = await api.search(currentTitle, sources, store.yellowFilter, {
+          signal: controller.signal,
+          onSource: (outcome) => { if (!cancelled) accept(outcome.list); },
+        });
         if (cancelled) return;
-        setCandidates(matched);
+        accept(list);
+        setPhase('testing');
+        // 新任务由队列补入；已完成的候选立即可点，不等待其他线路。
+        while (!cancelled && (active || queue.length)) await Promise.all([...pending]);
+        if (cancelled) return;
         setPhase('done');
       } catch (err) {
         // 主动中止不算失败，不提示
@@ -308,7 +326,7 @@ export function SwitchSourceModal({
 
         {/* 内容区独占剩余高度并自己滚动：标题与拖拽条始终可见，不随内容滚走 */}
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
-        {phase !== 'done' ? (
+        {phase !== 'done' && !sorted.length ? (
           <LoadingState label={phase === 'searching' ? '搜索各资源中...' : '测速中...'} />
         ) : sorted.length === 0 ? (
           <EmptyState variant="plain" title="其他点播源未找到同名资源" />
@@ -352,9 +370,9 @@ export function SwitchSourceModal({
                           )}
                           title={`${c.ms}ms`}
                         />
-                      ) : (
+                      ) : c.ok === false ? (
                         <span className="text-[10px] text-danger">失败</span>
-                      )}
+                      ) : <span className="text-[10px]">检测中</span>}
                     </button>
                   );
                 })}
@@ -405,14 +423,14 @@ export function SwitchSourceModal({
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 sm:max-w-[16rem]">
                       <div className="rounded-md bg-chip px-2 py-1.5">
-                        <div className="text-[10px] text-faint">速度</div>
+                        <div className="text-[10px] text-faint">详情响应</div>
                         <div
                           className={cn(
                             'text-xs font-medium tabular-nums',
                             !c.ok ? 'text-danger' : (c.ms ?? 0) > 2000 ? 'text-warning' : 'text-success'
                           )}
                         >
-                          {c.ok ? `${c.ms}ms` : '不可用'}
+                          {c.ok ? `${c.ms}ms` : c.ok === false ? '不可用' : '检测中'}
                         </div>
                       </div>
                       <div className="rounded-md bg-chip px-2 py-1.5">

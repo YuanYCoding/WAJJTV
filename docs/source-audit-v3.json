@@ -1,0 +1,342 @@
+{
+  "checkedAt": "2026-10-23",
+  "candidateCount": 232,
+  "jsonVariantsRetested": 179,
+  "nodeRetested": 183,
+  "notes": "From production server; HLS playlist and first/middle segments were fetched, standard AES-128 HLS decoded where needed, video codecs measured with ffprobe. Sample resolution is not a promise for all titles. Eight additions are mirrors of existing providers; only Aidan adds a provider family. No account-authorized cloud playback was possible before owner authorization.",
+  "additions": [
+    {
+      "name": "虎牙资源（M3U8 备用）",
+      "url": "https://www.huyaapi.com/api.php/provide/vod/from/hym3u8",
+      "origin": "https://raw.githubusercontent.com/TVboxorg/TVbox/main/dist/official.json",
+      "searchMs": 1805,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 1262
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 1813
+        }
+      ],
+      "samples": [
+        "sample-0-0.bin",
+        "sample-0-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 804
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 804
+        }
+      ]
+    },
+    {
+      "name": "非凡资源（五号备用 HTTP）",
+      "url": "http://ffzy5.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/TVboxorg/TVbox/main/dist/official.json",
+      "searchMs": 607,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 1810
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 516
+        }
+      ],
+      "samples": [
+        "sample-1-0.bin",
+        "sample-1-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "name": "非凡资源（直连备用）",
+      "url": "http://ffzy.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/qist/tvbox/master/jsm.json",
+      "searchMs": 449,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 584
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 1067
+        }
+      ],
+      "samples": [
+        "sample-2-0.bin",
+        "sample-2-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "name": "非凡资源（WWW 备用）",
+      "url": "http://www.ffzy.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/zhbjzhql1/TVBox/main/zyplayer.json",
+      "searchMs": 703,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 3260
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 675
+        }
+      ],
+      "samples": [
+        "sample-3-0.bin",
+        "sample-3-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "name": "非凡资源（八号备用）",
+      "url": "https://yonghu.ffzyapi8.com/api.php/provide/vod/from/ffm3u8/at/json",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "searchMs": 3949,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 2550
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 2391
+        }
+      ],
+      "samples": [
+        "sample-5-0.bin",
+        "sample-5-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "name": "非凡资源（五号备用 HTTPS）",
+      "url": "https://ffzy5.tv/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "searchMs": 971,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 3643
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 1194
+        }
+      ],
+      "samples": [
+        "sample-6-0.bin",
+        "sample-6-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 800
+        }
+      ]
+    },
+    {
+      "name": "速播资源（备用域名）",
+      "url": "https://subocj.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "searchMs": 3679,
+      "film": "流浪地球",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 1841
+        },
+        {
+          "title": "庆余年",
+          "count": 8,
+          "ms": 2643
+        }
+      ],
+      "samples": [
+        "sample-7-0.bin",
+        "sample-7-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 752
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1920,
+          "height": 752
+        }
+      ]
+    },
+    {
+      "name": "猫眼资源（备用域名）",
+      "url": "https://maoyanzy.com/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/oooopera/moontv_config/main/input.json",
+      "searchMs": 1737,
+      "film": "流浪地球2",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 0,
+          "ms": 2476
+        },
+        {
+          "title": "庆余年",
+          "count": 1,
+          "ms": 1874
+        }
+      ],
+      "samples": [
+        "sample-9-0.bin",
+        "sample-9-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 3840,
+          "height": 1608
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 3840,
+          "height": 1608
+        }
+      ]
+    },
+    {
+      "name": "艾旦影视",
+      "url": "https://lovedan.net/api.php/provide/vod",
+      "origin": "https://raw.githubusercontent.com/smallmain/moontv-aggr-config/main/full.json",
+      "searchMs": 5708,
+      "film": "流浪地球",
+      "checks": [
+        {
+          "title": "琅琊榜",
+          "count": 2,
+          "ms": 4177
+        },
+        {
+          "title": "庆余年",
+          "count": 12,
+          "ms": 3584
+        }
+      ],
+      "samples": [
+        "more-0-0.bin",
+        "more-0-120.bin"
+      ],
+      "videoSamples": [
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1280,
+          "height": 504
+        },
+        {
+          "codec_name": "h264",
+          "codec_type": "video",
+          "width": 1280,
+          "height": 504
+        }
+      ]
+    }
+  ]
+}

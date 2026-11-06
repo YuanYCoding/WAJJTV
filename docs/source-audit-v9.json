@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-27",
+  "method": "Public endpoint checks from the deployment server, followed by official cloud directory video proof; no account credentials sent to search providers.",
+  "added": [
+    {"id":"wanou","name":"玩偶片库","origin":"https://woog.nxog.eu.org","result":"HTTP 200 CMS search with a real Quark share; duplicate shares may be merged with existing sources"},
+    {"id":"aipan","name":"爱盼影视","origin":"https://www.aipan.me","result":"HTTP 200 movie search and detail; sample two Quark shares and 29 magnet links, cloud shares validated by directory scanner"},
+    {"id":"pan365","name":"365 聚合","origin":"https://pan.365wp.top","result":"HTTP 200 search and public link resolution; verified video shares streamed before slower remaining queries finish"}
+  ],
+  "not_added": [
+    {"id":"pan666","result":"server HTTP 520; local HTTP 403"},
+    {"id":"pansearch","result":"connection reset from server"},
+    {"id":"jikepan","result":"connection failed / timeout"},
+    {"id":"hunhepan","result":"empty or unsupported response"},
+    {"id":"kuake8","result":"HTTP 400"},
+    {"id":"misoso","result":"connection failed"},
+    {"id":"pansousuo","result":"HTTP 502"},
+    {"id":"pansou-public","result":"public node HTTP 400; alternate hostname connection failed"},
+    {"id":"haisou","result":"connection refused"},
+    {"id":"miaoso","result":"HTTP 403"},
+    {"id":"quarkres","result":"HTTP 200 but zero results for three sample queries"},
+    {"id":"panta","result":"connection failed"},
+    {"id":"alupan","result":"HTTP 403"},
+    {"id":"panwiki","result":"HTTP 200 HTML without usable search results in tested request"},
+    {"id":"hdmoli","result":"HTTP 200 search HTML without extractable tested results"},
+    {"id":"sousou","result":"HTTP 200 HTML without usable links in tested request"},
+    {"id":"duoduo","result":"connection failed"},
+    {"id":"labi","result":"timeout"},
+    {"id":"shandian","result":"tested mirrors returned no usable results / 404 / 522"},
+    {"id":"xdyh","result":"tested GET returned no usable results; POST 405"},
+    {"id":"yuhuage","result":"tested path HTTP 404"},
+    {"id":"sopanya","result":"search API requires interactive security verification"},
+    {"id":"qupansou","result":"invalid self-signed TLS certificate; certificate checks retained"},
+    {"id":"jupansou","result":"HTTP 403"},
+    {"id":"feikuai","result":"HTTP 429"}
+  ],
+  "references": ["https://github.com/fish2018/pansou", "https://github.com/fish2018/pansou/tree/main/plugin"]
+}

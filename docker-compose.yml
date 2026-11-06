@@ -1,17 +1,26 @@
 services:
-  libretv:
+  wajjtv:
     build: .
     # 版本管理：镜像 tag 与 package.json 的 version 保持一致
-    # - 使用者：不设置 LIBRETV_IMAGE 即拉取 ghcr.io/librespark/libretv:latest（首次部署用 docker compose pull）
-    # - 开发者：docker compose up -d --build 会在本地构建并打上同名 tag
-    # - 需要固定版本时设置 LIBRETV_IMAGE=ghcr.io/librespark/libretv:2.0.1
-    image: ${LIBRETV_IMAGE:-ghcr.io/librespark/libretv:latest}
-    container_name: libretv
+    # docker compose up -d --build 构建本仓库；可用 WAJJTV_IMAGE 固定自己的镜像。
+    image: ${WAJJTV_IMAGE:-wajjtv:local}
+    container_name: wajjtv
     restart: unless-stopped
+    init: true
     ports:
-      - "8080:8080"
-    # 无状态服务：观看历史在浏览器 IndexedDB、设置在 localStorage，无需挂载卷
+      - "127.0.0.1:${PORT:-8080}:8080"
+    env_file: .env
+    volumes:
+      - wajjtv_data:/app/data
+      - ./private:/app/private:ro
+    security_opt:
+      - no-new-privileges:true
+    # 双人片单在持久卷，旧观看历史仍在浏览器中。
     environment:
+      - SITE_ORIGIN=${SITE_ORIGIN:?请设置浏览器访问网站的完整 origin}
+      - LIBRARY_DATA_DIR=/app/data
+      - HEALTH_DATA_DIR=/app/data
+      - PRIVATE_ASSETS_DIR=/app/private
       # 必填：访问密码（在 .env 中设置，缺失时 compose 启动即报错提醒）
       - PASSWORD=${PASSWORD:?请在 .env 中设置 PASSWORD}
       # 可选：会话/代理签名密钥（多实例部署建议显式设置：openssl rand -hex 32）
@@ -39,3 +48,6 @@ services:
       # - USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36
       # 可选：影视榜单推荐源（60s API）实例地址，官方公共实例有限流
       # - 60S_API_BASE=https://60s.crystelf.top
+
+volumes:
+  wajjtv_data:

@@ -1,0 +1,13 @@
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { resourceSources, saveResourceSources, validateResourceSources, enabledResourceSources, sourceRevisionKey } from './resource-source-store';
+vi.mock('./ssrf', () => ({ isValidProxyUrl: (v: string) => /^https?:\/\//.test(v) && !/127\.0\.0\.1|localhost/.test(v), checkUpstreamAllowed: vi.fn(async () => ({ ok: true })) }));
+let dir: string;
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'source-config-')); vi.stubEnv('LIBRARY_DATA_DIR', dir); });
+afterEach(() => { vi.unstubAllEnvs(); rmSync(dir, { recursive: true, force: true }); });
+it('persists shared interface edits atomically and applies disable/delete/custom sources to search', async () => { const c = resourceSources(), key = sourceRevisionKey(); const base = c.sources.find((v) => v.kind === 'hls')!; const next = c.sources.filter((v) => v.id !== 'hls-mangguo').map((v) => v.id === base.id ? { ...v, enabled: false } : v); next.push({ id: 'custom', name: '私有搜索接口', kind: 'pan', adapter: 'pansou', enabled: true, url: 'https://public.example/api/search' }); await saveResourceSources(c.revision, next); expect(resourceSources().revision).toBe(1); expect(resourceSources().sources.some((v) => v.id === 'hls-mangguo')).toBe(false); expect(enabledResourceSources('hls').some((v) => v.id === base.id)).toBe(false); expect(enabledResourceSources('pan').some((v) => v.id === 'custom')).toBe(true); expect(sourceRevisionKey()).not.toBe(key); expect(JSON.parse(readFileSync(join(dir, 'resource-sources.json'), 'utf8')).deleted).toContain('hls-mangguo'); });
+it('rejects stale revisions instead of overwriting the other device', async () => { const c = resourceSources(); await saveResourceSources(c.revision, c.sources); await expect(saveResourceSources(c.revision, c.sources)).rejects.toMatchObject({ code: 'CONFIG_CONFLICT' }); });
+it('rejects private targets, credentials, duplicate addresses and executable adapter types', () => { const source = { id: 'test', name: 'test', kind: 'pan', adapter: 'pansou', enabled: true, url: 'https://public.example/api' }; for (const patch of [{ url: 'http://127.0.0.1/api' }, { url: 'https://user:pass@public.example/api' }, { adapter: 'javascript' }]) expect(() => validateResourceSources([{ ...source, ...patch }])).toThrow(); expect(() => validateResourceSources([source, { ...source, id: 'second' }])).toThrow(); });
+it('does not permit adapter changes on built-in sources', () => { const source = resourceSources().sources.find((v) => v.id === 'yunso')!; expect(() => validateResourceSources([{ ...source, adapter: 'pan-json' }])).toThrow(); });

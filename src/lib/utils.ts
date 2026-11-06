@@ -62,10 +62,22 @@ export function buildImageUrl(
 export function buildImageCandidates(
   url: string | undefined,
   mode: 'direct' | 'proxy' | 'custom',
-  customTemplate: string
+  customTemplate: string,
+  fallbackUrls: string[] = []
 ): string[] {
+  if (fallbackUrls.length) {
+    const urls = [...new Set([url, ...fallbackUrls].filter((value): value is string => !!value))];
+    const chains = urls.map((value) => buildImageCandidates(value, mode, customTemplate));
+    return [...new Set([...chains.map((chain) => chain[0]), ...chains.flatMap((chain) => chain.slice(1))].filter(Boolean))];
+  }
   const built = buildImageUrl(url, mode, customTemplate);
   if (!built || !url) return [];
+  // This provider serves identical /upload assets on its main HTTPS host.
+  // The dedicated :7788 image host refuses connections from the deployment server.
+  const mirror360 = url.replace(/^https?:\/\/(?:www\.)?imgzy360\.com(?::\d+)?(?=\/upload\/)/i, 'https://360zy.com');
+  if (mirror360 !== url && mode !== 'custom') {
+    return [...new Set([...buildImageCandidates(mirror360, mode, customTemplate), built, url])];
+  }
   const mirrors = url.includes('doubanio.com')
     ? [
         url.replace(/img\d+\.doubanio\.com/g, 'img.doubanio.cmliussss.net'),

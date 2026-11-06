@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { guardRequest } from '@/lib/api-guard';
 import { checkUpstreamAllowed } from '@/lib/ssrf';
-import { fetchUpstream } from '@/lib/fetch-utils';
-import { parseSearchList } from '@/lib/cms-parser';
+import { probeSource } from '@/lib/source-health-server';
 
 export const runtime = 'nodejs';
 
@@ -27,24 +26,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, ms: 0, error: verdict.reason });
   }
 
-  const start = Date.now();
-  try {
-    const res = await fetchUpstream(`${url}?ac=videolist&wd=test`, {
-      timeoutMs: 6000,
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122.0.0.0 Safari/537.36', Accept: 'application/json' },
-    });
-    const ms = Date.now() - start;
-    if (!res.ok) {
-      return NextResponse.json({ ok: false, ms, error: `HTTP ${res.status}` });
-    }
-    const data = await res.json();
-    const list = parseSearchList(data, { key: 'test', name: 'test', url });
-    return NextResponse.json({ ok: true, ms, count: list.length });
-  } catch (err) {
-    return NextResponse.json({
-      ok: false,
-      ms: Date.now() - start,
-      error: err instanceof Error ? (err.name === 'TimeoutError' || err.name === 'AbortError' ? '超时' : err.message) : '请求失败',
-    });
-  }
+  const health = await probeSource(url);
+  return NextResponse.json({ ok: health.status === 'healthy', ms: health.ms, error: health.error, count: 0 });
 }

@@ -12,3 +12,11 @@ vitest-results.json
 .zcode/
 .codebuddy/
 generated-images/
+private/
+data/
+.qa/
+
+# Personal portrait branding is supplied by the private deployment archive.
+/public/icons/jjbitv-192.png
+/public/icons/jjbitv-512.png
+/public/favicon.ico

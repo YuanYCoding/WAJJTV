@@ -7,6 +7,11 @@ import type { ReactNode } from 'react';
  */
 
 export type IconName =
+  | 'queue'
+  | 'play'
+  | 'pause'
+  | 'skipPrevious'
+  | 'skipNext'
   | 'close'
   | 'edit'
   | 'refresh'
@@ -27,6 +32,11 @@ export type IconName =
   | 'home';
 
 const PATHS: Record<IconName, ReactNode> = {
+  queue: <path d="M4 6h16M4 12h16M4 18h10" strokeWidth={1.7} strokeLinecap="round" />,
+  play: <path d="m9 5 10 7-10 7V5Z" fill="currentColor" strokeWidth={0} />,
+  pause: <path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor" strokeWidth={0} />,
+  skipPrevious: <><path d="M6 5v14" strokeWidth={2} /><path d="m18 5-10 7 10 7V5Z" fill="currentColor" strokeWidth={0} /></>,
+  skipNext: <><path d="M18 5v14" strokeWidth={2} /><path d="m6 5 10 7-10 7V5Z" fill="currentColor" strokeWidth={0} /></>,
   close: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />,
   edit: (
     <path

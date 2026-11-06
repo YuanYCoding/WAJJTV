@@ -188,6 +188,27 @@ export function findH264Sps(es: Uint8Array): Uint8Array | undefined {
   return undefined;
 }
 
+/** HEVC SPS up to conformance_window: no pixel decoding or profile heuristics. */
+export function parseHevcSps(rbsp: Uint8Array): MediaResolution | undefined {
+  try {
+    const r = new BitReader(rbsp), skip = (bits: number) => { for (let i = 0; i < bits; i++) r.readBits(1); };
+    skip(4); const sublayers = r.readBits(3); skip(1); skip(96);
+    const profile: number[] = [], level: number[] = [];
+    for (let i = 0; i < sublayers; i++) { profile.push(r.readBits(1)); level.push(r.readBits(1)); }
+    if (sublayers) skip((8 - sublayers) * 2);
+    for (let i = 0; i < sublayers; i++) { if (profile[i]) skip(88); if (level[i]) skip(8); }
+    r.readUE(); const chroma = r.readUE(); if (chroma > 3) return undefined; if (chroma === 3) skip(1);
+    let width = r.readUE(), height = r.readUE();
+    if (r.readBits(1)) { const left = r.readUE(), right = r.readUE(), top = r.readUE(), bottom = r.readUE(); width -= (chroma === 1 || chroma === 2 ? 2 : 1) * (left + right); height -= (chroma === 1 ? 2 : 1) * (top + bottom); }
+    return width > 0 && height > 0 && width <= 16384 && height <= 16384 ? { width, height } : undefined;
+  } catch { return undefined; }
+}
+export function findHevcSps(es: Uint8Array): Uint8Array | undefined {
+  const starts = findStartCodes(es);
+  for (let i = 0; i < starts.length; i++) { const from = starts[i], to = i + 1 < starts.length ? starts[i + 1] - 3 : es.length; if (((es[from] >> 1) & 0x3f) === 33 && to > from + 2) return unescapeRbsp(es.subarray(from + 2, to)); }
+  return undefined;
+}
+
 // ——— MPEG-TS ———
 
 const TS_PACKET_SIZE = 188;
@@ -245,7 +266,7 @@ function parsePat(payload: Uint8Array): number {
   return -1;
 }
 
-/** PMT：返回 H.264 视频轨的 PID（0x1b）。HEVC(0x24) 不解析——见文件末尾说明 */
+/** PMT: H.264 (0x1b) / HEVC (0x24) video PID. */
 function parsePmt(payload: Uint8Array): number {
   const begin = 1 + payload[0];
   if (begin + 12 > payload.length) return -1;
@@ -258,7 +279,7 @@ function parsePmt(payload: Uint8Array): number {
     const streamType = payload[p];
     const pid = ((payload[p + 1] & 0x1f) << 8) | payload[p + 2];
     const esInfoLength = ((payload[p + 3] & 0x0f) << 8) | payload[p + 4];
-    if (streamType === 0x1b) return pid;
+    if (streamType === 0x1b || streamType === 0x24) return pid;
     p += 5 + esInfoLength;
   }
   return -1;
@@ -315,8 +336,8 @@ export function parseTsVideoResolution(buf: Uint8Array): MediaResolution | undef
   const es = collectElementaryStream(buf, start, videoPid);
   if (es.length === 0) return undefined;
   const sps = findH264Sps(es);
-  if (!sps) return undefined;
-  return parseH264Sps(sps);
+  const avc = sps ? parseH264Sps(sps) : undefined; if (avc) return avc;
+  const hevc = findHevcSps(es); return hevc ? parseHevcSps(hevc) : undefined;
 }
 
 // ——— MP4 / fMP4 ———
@@ -423,10 +444,3 @@ export function decryptAes128CbcPrefix(buf: Uint8Array, key: Uint8Array, iv: Uin
   const out = decipher.update(buf.subarray(0, usable));
   return new Uint8Array(out.buffer, out.byteOffset, out.byteLength);
 }
-
-/**
- * 已知不支持：HEVC/H.265 的 SPS。
- * TS 里能识别到它的 PID，但解析尺寸要正确跳过 profile_tier_level（含 33 位保留位与
- * 子层循环），逻辑繁琐且缺少真实样本可验证，写错会静默给出错误分辨率——
- * 那比「未知」更糟。这类源仍会显示「未知」，播放一次后由播放器实测补上。
- */
