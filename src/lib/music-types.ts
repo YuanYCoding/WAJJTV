@@ -1,6 +1,6 @@
 export const MUSIC_SOURCES = [
-  { id: 'wy', name: '网易云', description: '歌曲搜索 · 公开音频' },
   { id: 'tx', name: 'QQ音乐', description: '歌曲搜索 · 公开音频' },
+  { id: 'wy', name: '网易云', description: '歌曲搜索 · 公开音频' },
   { id: 'kw', name: '酷我', description: '歌曲搜索 · 公开音频' },
   { id: 'kg', name: '酷狗', description: '歌曲搜索 · 按单曲检测可用性' },
   { id: 'audius', name: 'Audius', description: '独立音乐 · 艺术家公开上传' },
