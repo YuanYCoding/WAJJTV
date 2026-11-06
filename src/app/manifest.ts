@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'JjBiTV · 私人影院',
+    name: 'JjBiTV · 私人影音空间',
     short_name: 'JjBiTV',
-    description: '海清和静静自用追剧资源',
+    description: '海清和静静的私人影音空间 · 观影与听歌',
     start_url: '/',
     display: 'standalone',
     background_color: '#111111',

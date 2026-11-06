@@ -44,7 +44,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     {children}
     {open && <div className="profile-overlay" onKeyDown={(e) => { if (e.key === 'Escape' && profile && !saving) setRequested(false); }}>
       <div className="profile-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-heading" ref={dialogRef} tabIndex={-1}>
-        <p className="profile-wordmark">WAJJTV</p><h2 id="profile-heading">今晚，是谁来选片？</h2><p className="text-muted text-sm mt-3">你们的片单放在一起，喜欢什么，各自记录。</p>
+        <p className="profile-wordmark">WAJJTV</p><h2 id="profile-heading">选择档案</h2>
         <div className="profile-choices">{PROFILES.map((p) => <button key={p.id} disabled={saving} onClick={() => void select(p.id)} aria-label={`选择${p.name}`} className={profile === p.id ? 'active' : ''}><span className={`profile-avatar ${p.id}`}>{p.name[0]}</span><strong>{p.name}</strong><span>{profile === p.id ? '当前档案' : '进入我的片单'}</span></button>)}</div>
         {error && <p className="text-danger text-sm" role="alert">{error}</p>}
         {saving && <p className="text-accent text-sm" role="status">正在切换档案…</p>}

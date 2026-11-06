@@ -169,8 +169,8 @@ function LoginGate({
           </>
         ) : (
           <>
-            <h2 className="text-lg font-semibold text-content mb-1">欢迎回到私人放映室</h2>
-            <p className="text-sm text-muted mb-4">输入访问密码，开始今晚的好故事。</p>
+            <h2 className="text-lg font-semibold text-content mb-1">欢迎回来</h2>
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();

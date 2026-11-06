@@ -41,7 +41,7 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-line">
         <div className="cinema-shell mx-auto h-16 flex items-center gap-3">
           <Link href="/" aria-label="JjBiTV 首页" className="wajjtv-brand shrink-0"><Image src="/icons/jjbitv-192.png" width="36" height="36" alt="" className="rounded-xl" /><span>JjBiTV</span></Link>
-          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' || pathname === '/collection' ? 'active' : ''}>发现</Link><Link href="/pan" className={pathname.startsWith('/pan') ? 'active' : ''}>网盘追剧</Link><Link href="/resources" className={pathname === '/resources' ? 'active' : ''}>其他资源</Link><Link href="/live" className={pathname === '/live' ? 'active' : ''}>直播</Link></nav>}
+          {!showSearch && <nav className="primary-nav" aria-label="主导航"><Link href="/" className={pathname === '/' ? 'active' : ''}>首页</Link><Link href="/#films">观影</Link><Link href="/music" className={pathname === '/music' ? 'active' : ''}>听歌</Link><Link href="/pan" className={pathname.startsWith('/pan') ? 'active' : ''}>网盘</Link><Link href="/resources" className={pathname === '/resources' ? 'active' : ''}>其他资源</Link><Link href="/live" className={pathname === '/live' ? 'active' : ''}>直播</Link></nav>}
 
           {showSearch && (
             <form
@@ -109,7 +109,7 @@ export function Header({ showSearch = false }: { showSearch?: boolean }) {
           </nav>
         </div>
       </header>
-      {!['/watch', '/live'].includes(pathname) && <nav className="mobile-cinema-nav" aria-label="手机主导航"><Link href="/" aria-current={pathname === '/' || pathname === '/collection' ? 'page' : undefined}>发现</Link><Link href="/pan" aria-current={pathname.startsWith('/pan') ? 'page' : undefined}>网盘追剧</Link><Link href="/resources" aria-current={pathname === '/resources' ? 'page' : undefined}>其他资源</Link><Link href="/live" aria-current={pathname === '/live' ? 'page' : undefined}>直播</Link></nav>}
+      {!['/watch', '/live'].includes(pathname) && <nav className="mobile-cinema-nav" aria-label="手机主导航"><Link href="/" aria-current={pathname === '/' ? 'page' : undefined}>首页</Link><Link href="/#films">观影</Link><Link href="/music" aria-current={pathname === '/music' ? 'page' : undefined}>听歌</Link><Link href="/pan" aria-current={pathname.startsWith('/pan') ? 'page' : undefined}>网盘</Link><Link href="/resources" aria-current={pathname === '/resources' ? 'page' : undefined}>其他资源</Link><Link href="/live" aria-current={pathname === '/live' ? 'page' : undefined}>直播</Link></nav>}
 
       <SourceManagerDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <HistoryPanel open={historyOpen} onClose={() => setHistoryOpen(false)} />

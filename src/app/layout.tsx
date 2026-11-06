@@ -2,15 +2,16 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './cinema.css';
 import './library.css';
+import './music.css';
 import { Providers } from '@/components/providers';
 
 export const metadata: Metadata = {
   title: {
-    default: 'JjBiTV · 海清和静静的私人影院',
+    default: 'JjBiTV · 海清和静静的私人影音空间',
     template: '%s - JjBiTV',
   },
   description:
-    '海清和静静自用追剧资源。一起发现好电影、好剧集，收藏每一段共度的时光。',
+    '海清和静静的私人影音空间。一起发现好电影、好剧集和好音乐，收藏每一段共度的时光。',
   manifest: '/manifest.webmanifest',
   // 图标与门户站（LibreTV-portal）同一套：同一张 artwork 导出的多尺寸 + 根目录 favicon.ico 兜底。
   // 只声明单张 512 时，抓取端只能拿大图缩放，小尺寸下易糊、看起来「没填满」。

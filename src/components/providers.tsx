@@ -11,6 +11,7 @@ import { api, STATUS_QUERY_KEY } from '@/lib/client-api';
 import { applyEnvPresets } from '@/lib/subscription-sync';
 import { SourceHealthMonitor } from './source-health-monitor';
 import { FilmPreviewProvider } from './film-preview';
+import { MusicProvider } from './music-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -52,7 +53,7 @@ export function Providers({ children }: { children: ReactNode }) {
           {/* 全站常驻：下载事件监听（enqueueDownload）依赖它存在——
               挂在 Header 里会让 /watch 等不渲染 Header 的页面派发的事件凭空丢失 */}
           <GlobalDownloadManager />
-          <AuthProvider><FilmPreviewProvider><SourceHealthMonitor />{children}</FilmPreviewProvider></AuthProvider>
+          <AuthProvider><MusicProvider><FilmPreviewProvider><SourceHealthMonitor />{children}</FilmPreviewProvider></MusicProvider></AuthProvider>
         </ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>

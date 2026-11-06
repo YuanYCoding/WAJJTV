@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Drawer } from './drawer';
 import dynamic from 'next/dynamic';
 const ResourceSourceManager = dynamic(() => import('./resource-source-manager').then((m) => m.ResourceSourceManager));
+const MusicSourceManager = dynamic(() => import('./music-source-manager').then((m) => m.MusicSourceManager));
 import { ConfirmDialog } from './confirm-dialog';
 import { Icon, type IconName } from './icon';
 import { LiveSourceManager } from './live-source-manager';
@@ -41,7 +42,7 @@ import { describeParseStats } from '@/lib/tvbox-parser';
  */
 
 type PrimaryTab = 'sources' | 'prefs' | 'data';
-type SecondaryTab = 'vod' | 'live' | 'subs' | 'pan' | 'hls' | 'playback' | 'image' | 'home' | 'io';
+type SecondaryTab = 'vod' | 'live' | 'subs' | 'pan' | 'hls' | 'music' | 'playback' | 'image' | 'home' | 'io';
 
 const PRIMARY_TABS: { id: PrimaryTab; label: string; icon: IconName }[] = [
   { id: 'sources', label: '源管理', icon: 'link' },
@@ -54,6 +55,7 @@ const SECONDARY_TABS: Record<PrimaryTab, { id: SecondaryTab; label: string }[]> 
     { id: 'vod', label: '点播源' },
     { id: 'pan', label: '网盘接口' },
     { id: 'hls', label: 'M3U8 接口' },
+    { id: 'music', label: '音乐源' },
     { id: 'live', label: '直播源' },
     { id: 'subs', label: '数据源订阅' },
   ],
@@ -137,6 +139,7 @@ export function SourceManagerDrawer({ open, onClose }: { open: boolean; onClose:
       {current === 'vod' && <VodSourcesPanel />}
       {current === 'pan' && <ResourceSourceManager key="pan" kind="pan" />}
       {current === 'hls' && <ResourceSourceManager key="hls" kind="hls" />}
+      {current === 'music' && <MusicSourceManager />}
       {current === 'live' && <LiveSourceManager />}
       {current === 'playback' && <PlaybackPanel />}
       {current === 'image' && <ImagePanel />}
@@ -574,7 +577,7 @@ function PlaybackPanel() {
       <div className="space-y-3">
         <ToggleRow
           label="广告切片过滤"
-          description="剔除播放列表中的广告分片段落（按分片 URL 特征、片头插入与长片间超短中插识别，不动 DISCONTINUITY 时间轴）"
+          description="尝试跳过广告分片"
           checked={store.adFilter}
           onChange={(v) => store.updateSettings({ adFilter: v })}
         />
@@ -614,7 +617,7 @@ function VideoCachePanel() {
     <div className="space-y-3 pt-3 mt-3 border-t border-line">
       <ToggleRow
         label="片段本地缓存"
-        description="暂停或观看时把后续分片缓存到浏览器本地，二次播放与断网卡顿时直接命中（存储于本机，不计入配置导出）"
+        description="在此设备缓存后续片段，减少重复加载"
         checked={enabled}
         onChange={(v) => {
           const next = saveCacheSettings({ enabled: v });

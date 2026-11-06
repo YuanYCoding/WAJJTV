@@ -273,7 +273,7 @@ function LiveContent() {
                       <span className="tag bg-chip text-faint shrink-0">{currentChannel.group}</span>
                     )}
                   </div>
-                  <p className="text-xs text-faint truncate mt-0.5">{currentChannel.url}</p>
+                  <details className="text-xs text-faint mt-1"><summary className="cursor-pointer">播放地址</summary><p className="break-all mt-2">{currentChannel.url}</p></details>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   <button

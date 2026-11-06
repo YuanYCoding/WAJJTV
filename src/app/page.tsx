@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/header';
 import { DiscoverSection } from '@/components/discover-section';
-import { CoupleMascots } from '@/components/couple-mascots';
+import { EntertainmentWelcome } from '@/components/entertainment-welcome';
 import { sourceIdentity } from '@/lib/source-health';
 import { DetailModal } from '@/components/detail-modal';
 import { AggregatedCard, aggregateResults } from '@/components/video-card';
@@ -179,13 +179,12 @@ function HomeContent() {
       <Header />
 
       <main className="cinema-shell flex-1 w-full mx-auto">
+        {!urlQuery && <EntertainmentWelcome />}
         {/* 搜索区 */}
-        <section className={cn('home-search', urlQuery ? 'compact-search' : 'cinema-hero')}>
-          {!urlQuery && <CoupleMascots />}
+        <section id="films" className={cn('home-search', urlQuery ? 'compact-search' : 'portal-film-search')}>
           {!urlQuery && (
             <header className="hero-copy">
-              <h1>今晚，和你一起看<span>。</span></h1>
-              <p>海清和静静自用追剧资源</p>
+              <h2>电影、剧集，随心发现</h2>
             </header>
           )}
           {urlQuery && <h1 className="sr-only">JjBiTV 视频搜索</h1>}
