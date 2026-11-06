@@ -1,38 +1,33 @@
 import { randomBytes } from 'node:crypto';
-import { fetchUpstream } from './fetch-utils';
-import { MUSIC_SOURCES, musicText, parseMusicJson, type MusicSource, type MusicTrack, type MusicOutcome } from './music-types';
-
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36';
-// Next may bundle route handlers separately. Share ephemeral tickets across handlers in this process.
-const globalMusic = globalThis as typeof globalThis & { jjbitvMusic?: {
+import { setTimeout as delay } from 'node:timers/promises';
+import { musicData as data, type MusicRow as Row } from './music-http';
+import { MUSIC_SOURCES, musicText, musicKey, type MusicSource, type MusicTrack, type MusicOutcome, type MusicPlayback, type MusicQuality } from './music-types';
+import { probeMusicAudio, validateFullMusic } from './music-audio-probe';
+import { LX_MUSIC_RESOLVERS, musicCandidates } from './music-resolvers';
+type PlaybackResult = MusicPlayback & { preview: false; origin: string };
+interface ResolverHealth { ok?: boolean; failures: number; retryAt: number; ms?: number; codec?: string; kbps?: number; error?: string }
+interface MusicState {
   cache: Map<string, { at: number; value: MusicOutcome }>;
   health: Map<MusicSource, { failures: number; retryAt: number; ms?: number; error?: string }>;
-  tickets: Map<string, { url: string; expires: number }>;
+  tracks: Map<string, MusicTrack>;
+  playback: Map<string, PlaybackResult>;
+  negative: Map<string, number>;
+  tickets: Map<string, { url: string; expires: number; mimeType?: string }>;
+  resolverHealth: Map<string, ResolverHealth>;
+  slots: Map<string, number>;
   gdBudget: number[];
-} };
-const state = globalMusic.jjbitvMusic ??= { cache: new Map(), health: new Map(), tickets: new Map(), gdBudget: [] as number[] };
+  priorityWaiters: number;
+}
+const globalMusic = globalThis as typeof globalThis & { jjbitvMusic13?: MusicState };
+const state: MusicState = globalMusic.jjbitvMusic13 ??= { cache: new Map(), health: new Map(), tracks: new Map(), playback: new Map(), negative: new Map(), tickets: new Map(), resolverHealth: new Map(), slots: new Map(), gdBudget: [], priorityWaiters: 0 };
+state.priorityWaiters ??= 0;
 const { cache, health, tickets } = state;
-const gdBudget = state.gdBudget ??= [];
 async function gd(params: Record<string, string>, signal: AbortSignal): Promise<Row> {
-  const now = Date.now(); while (gdBudget.length && gdBudget[0] < now - 300_000) gdBudget.shift();
-  // The public GD service documents 50 requests / 5 minutes. Leave headroom.
-  if (gdBudget.length >= 35) throw new Error('备用来源正在休息');
-  gdBudget.push(now);
-  return data('https://music-api.gdstudio.xyz/api.php?' + new URLSearchParams(params), signal);
+  const now = Date.now(); while (state.gdBudget.length && state.gdBudget[0] < now - 300_000) state.gdBudget.shift();
+  if (state.gdBudget.length >= 35) throw new Error('备用来源正在休息');
+  state.gdBudget.push(now); return data('https://music-api.gdstudio.xyz/api.php?' + new URLSearchParams(params), signal);
 }
-// Provider catalogs are untyped external data; normalize to MusicTrack before returning to clients.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Row = Record<string, any>;
-async function data(url: string, signal: AbortSignal, headers: Record<string, string> = {}): Promise<Row> {
-  const res = await fetchUpstream(url, { signal, timeoutMs: 6500, headers: { 'User-Agent': UA, Referer: new URL(url).origin + '/', ...headers } });
-  if (!res.ok || !res.body) throw new Error(`接口暂不可用（HTTP ${res.status}）`);
-  const reader = res.body.getReader(); let total = 0; const parts: Uint8Array[] = [];
-  for (;;) {
-    const { done, value } = await reader.read(); if (done) break;
-    total += value.length; if (total > 1_500_000) { await reader.cancel(); throw new Error('接口数据过大'); } parts.push(value);
-  }
-  return parseMusicJson(Buffer.concat(parts).toString('utf8')) as Row;
-}
+function remember(track: MusicTrack) { if (state.tracks.size >= 1600) state.tracks.delete(state.tracks.keys().next().value!); state.tracks.set(musicKey(track), track); }
 const image = (u: unknown) => typeof u === 'string' && /^https?:\/\//.test(u) ? u.replace(/^http:/, 'https:') : '';
 async function catalog(source: MusicSource, query: string, page: number, signal: AbortSignal): Promise<MusicTrack[]> {
   const q = encodeURIComponent(query); let rows: Row[]; const base = { source, preview: source === 'apple' };
@@ -51,6 +46,11 @@ async function catalog(source: MusicSource, query: string, page: number, signal:
         for (const s of rows) items.push({ ...base, id: String(s.id), title: musicText(s.name), artist: (s.artists || []).map((a: Row) => musicText(a.name)).join(' / '), album: musicText(s.album?.name), duration: Number(s.duration) / 1000 || 0, cover: image(s.album?.picUrl) });
       }
       if (results.every(r => r.status === 'rejected')) throw new Error('目录暂不可用');
+      const unknown = items.filter(t => !t.duration && /^\d+$/.test(t.id)).slice(0, 20);
+      if (unknown.length) try {
+        const details = await data('https://music.163.com/api/song/detail?ids=' + encodeURIComponent(JSON.stringify(unknown.map(t => t.id))), signal);
+        for (const t of unknown) { const d = details.songs?.find((s: Row) => String(s.id) === t.id); if (d) { t.duration = Number(d.duration || d.dt) / 1000; t.cover = image(d.album?.picUrl || d.al?.picUrl); } }
+      } catch { /* entries without reference duration will be excluded by verification */ }
       const ids = new Set<string>(); return items.filter(t => { if (ids.has(t.id)) return false; ids.add(t.id); return true; });
     }
     case 'tx': {
@@ -86,80 +86,102 @@ async function catalog(source: MusicSource, query: string, page: number, signal:
     }
   }
 }
-export function musicHealth() { return MUSIC_SOURCES.map(s => ({ ...s, ...(health.get(s.id) || { failures: 0, retryAt: 0 }) })); }
+
+export function musicHealth() { return MUSIC_SOURCES.filter(s => s.id !== 'apple').map(s => ({ ...s, ...(health.get(s.id) || { failures: 0, retryAt: 0 }) })); }
+export function musicResolverHealth() { return LX_MUSIC_RESOLVERS.map(r => ({ ...r, health: state.resolverHealth.get(r.id) || { failures: 0, retryAt: 0 } })); }
 export async function searchMusic(source: MusicSource, query: string, page: number, signal: AbortSignal): Promise<MusicOutcome> {
+  if (source === 'apple') return { source, tracks: [], ms: 0 };
   const key = `${source}:${page}:${query.toLowerCase()}`, hit = cache.get(key);
-  if (hit && Date.now() - hit.at < 120_000) return { ...hit.value, cached: true };
+  if (hit && Date.now() - hit.at < 300_000) return { ...hit.value, cached: true };
   const h = health.get(source);
-  if (h && h.retryAt > Date.now()) return { source, tracks: [], ms: 0, error: '接口暂时休息，稍后自动重试' };
+  if (h && h.retryAt > Date.now()) return { source, tracks: [], ms: 0, error: '接口暂时休息' };
   const start = Date.now();
   try {
     const tracks = (await catalog(source, query, page, signal)).filter(t => /^[a-zA-Z0-9_-]{1,80}$/.test(t.id) && t.title).slice(0, 20);
-    const value = { source, tracks, ms: Date.now() - start };
+    tracks.forEach(remember); const value = { source, tracks, ms: Date.now() - start };
     health.set(source, { failures: 0, retryAt: 0, ms: value.ms });
     if (cache.size >= 160) cache.delete(cache.keys().next().value!);
     cache.set(key, { at: Date.now(), value }); return value;
   } catch {
     const failures = (h?.failures || 0) + 1;
     if (!signal.aborted) health.set(source, { failures, retryAt: failures >= 3 ? Date.now() + 60_000 : 0, error: '目录接口暂不可用' });
-    return { source, tracks: [], ms: Date.now() - start, error: '目录接口暂不可用，可换其他来源' };
+    return { source, tracks: [], ms: Date.now() - start, error: '目录接口暂不可用' };
   }
-}
-
-async function checkAudio(url: string, signal: AbortSignal): Promise<void> {
-  const u = new URL(url); if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password) throw new Error('音频地址无效');
-  const r = await fetchUpstream(url, { signal, timeoutMs: 7000, headers: { Range: 'bytes=0-4095', 'User-Agent': UA } });
-  try {
-    if (!r.ok || !r.body) throw new Error('音频线路未响应');
-    const type = r.headers.get('content-type') || '';
-    if (!/audio|octet-stream|video\/mp4/i.test(type)) throw new Error('音源未返回音频');
-    const total = Number(r.headers.get('content-range')?.split('/')[1] || r.headers.get('content-length') || 0);
-    // Some resolvers return a tiny spoken error MP3 with HTTP 200. Do not present it as a song.
-    if (total > 0 && total < 256_000) throw new Error('来源返回了无效的短音频');
-  } finally { await r.body?.cancel(); }
-}
-export async function resolveMusic(source: MusicSource, id: string, signal: AbortSignal) {
-  let url = '', preview = source === 'apple', checked = false; let origin = '';
-  if (source === 'apple') {
-    const d = await data(`https://itunes.apple.com/lookup?id=${id}&country=us`, signal);
-    url = d.results?.[0]?.previewUrl || ''; origin = 'Apple 官方试听';
-  } else if (source === 'audius') {
-    const d = await data(`https://api.audius.co/v1/tracks/${id}?app_name=JjBiTV`, signal);
-    if (d.data?.is_stream_gated || d.data?.is_streamable === false) throw new Error('该歌曲未公开播放');
-    url = `https://api.audius.co/v1/tracks/${id}/stream?app_name=JjBiTV`; origin = 'Audius 公开音频';
-  } else {
-    // Adapt the documented Huibq HTTP protocol, not downloaded/evaluated LX JavaScript.
-    try {
-      const d = await data(`https://lxmusicapi.onrender.com/url/${source}/${id}/320k`, signal, { 'X-Request-Key': 'share-v3' });
-      if (d.code !== 0 || typeof d.url !== 'string') throw new Error('未返回歌曲');
-      await checkAudio(d.url, signal); checked = true; url = d.url; origin = 'Huibq 公开音源';
-    } catch {
-      if (source === 'tx') {
-        try {
-          const d = await data(`https://api.vkeys.cn/v2/music/tencent/geturl?mid=${id}&quality=8`, signal);
-          if (d.code === 200 && d.data?.url && !d.data.ekey) {
-            await checkAudio(d.data.url, signal); checked = true; url = d.data.url;
-            preview = /试听|preview/i.test(String(d.data.quality)); origin = '落月API · QQ音乐' + (preview ? '试听' : '公开音频');
-          }
-        } catch { /* never decrypt protected files */ }
-      }
-      if (source === 'kw') {
-        try { const d = await data(`https://xiaoapi.cn/v1/music_kw.php?action=play&rid=${id}&br=p`, signal); if (d.code === 200 && d.data?.url) { await checkAudio(d.data.url, signal); checked = true; url = d.data.url; origin = '慕名API · 酷我公开音频'; } } catch { /* no playable fallback */ }
-      }
-      if (source === 'wy') {
-        try { const d = await gd({ types: 'url', source: 'netease', id, br: '999' }, signal); if (d.url) { await checkAudio(d.url, signal); checked = true; url = d.url; origin = 'GD音乐台 · 公开音频'; } } catch { /* official fallback below */ }
-        if (!url) {
-          const d = await data(`https://music.163.com/api/song/enhance/player/url?ids=%5B${id}%5D&br=320000`, signal);
-          url = d.data?.[0]?.url || ''; preview = Boolean(d.data?.[0]?.freeTrialInfo); origin = '网易云公开音频';
-        }
-      }
-    }
-  }
-  if (!url) throw new Error('这首歌当前没有可用音频，请试试同名歌曲的其他来源');
-  if (!checked) await checkAudio(url, signal);
-  for (const [key, value] of tickets) if (value.expires < Date.now()) tickets.delete(key);
-  if (tickets.size >= 300) tickets.delete(tickets.keys().next().value!);
-  const token = randomBytes(24).toString('hex'); tickets.set(token, { url, expires: Date.now() + 2 * 60 * 60_000 });
-  return { url: `/api/music/stream?ticket=${token}`, preview, origin };
 }
 export function musicTicket(token: string) { const t = tickets.get(token); return t && t.expires > Date.now() ? t : null; }
+export function knownMusicTrack(source: MusicSource, id: string) { return state.tracks.get(`${source}:${id}`); }
+async function lookupTrack(source: MusicSource, id: string, signal: AbortSignal): Promise<MusicTrack> {
+  const base: MusicTrack = { source, id, title: '', artist: '', album: '', cover: '', duration: 0 };
+  if (source === 'wy') { const d = await data('https://music.163.com/api/song/detail?ids=' + encodeURIComponent(JSON.stringify([id])), signal); const s = d.songs?.[0]; if (s) Object.assign(base, { title: musicText(s.name), duration: Number(s.duration || s.dt) / 1000 }); }
+  else if (source === 'tx') { const d = await data(`https://c.y.qq.com/v8/fcg-bin/fcg_play_single_song.fcg?songmid=${id}&format=json`, signal); const s = d.data?.[0]; if (s) Object.assign(base, { title: musicText(s.name || s.title), duration: Number(s.interval) }); }
+  else if (source === 'kw') { const d = await data(`https://m.kuwo.cn/newh5/singles/songinfoandlrc?musicId=${id}`, signal); const s = d.data?.songinfo; if (s) Object.assign(base, { title: musicText(s.songName), duration: Number(s.duration) }); }
+  else if (source === 'kg') { const d = await data(`https://m.kugou.com/app/i/getSongInfo.php?cmd=playInfo&hash=${id}`, signal); Object.assign(base, { title: musicText(d.songName), duration: Number(d.timeLength) }); }
+  else if (source === 'audius') { const d = await data(`https://api.audius.co/v1/tracks/${id}?app_name=JjBiTV`, signal); if (d.data) Object.assign(base, { title: musicText(d.data.title), duration: Number(d.data.duration) }); }
+  if (!(base.duration > 0)) throw new Error('无法确认原曲时长'); remember(base); return base;
+}
+export async function resolveMusic(source: MusicSource, id: string, signal: AbortSignal, options: { quality?: MusicQuality; track?: MusicTrack; fresh?: boolean; background?: boolean } = {}): Promise<PlaybackResult> {
+  if (source === 'apple') throw new Error('试听不进入播放列表');
+  const quality = options.quality || 'auto', key = `${source}:${id}:${quality}`;
+  if (options.fresh) { state.playback.delete(key); state.negative.delete(key); }
+  const track = options.track?.source === source && options.track.id === id ? options.track : knownMusicTrack(source, id) || await lookupTrack(source, id, signal);
+  const hit = state.playback.get(key);
+  if (!options.fresh && hit && hit.expires > Date.now() + 15_000 && musicTicket(hit.url.split('=')[1])) return hit;
+  // Reuse an already checked file for another label only if its REAL codec/bitrate meets that choice.
+  if (!options.fresh) for (const [cachedKey, value] of state.playback) {
+    if (!cachedKey.startsWith(`${source}:${id}:`) || value.expires <= Date.now() + 15000 || !musicTicket(value.url.split('=')[1])) continue;
+    try {
+      validateFullMusic({ ...value, size: 1, lossless: /FLAC|PCM/.test(value.codec) }, track.duration, quality);
+      const reused = { ...value, quality }; state.playback.set(key, reused); return reused;
+    } catch { /* a different quality really needs a different file */ }
+  }
+  if (!options.fresh && (state.negative.get(key) || 0) > Date.now()) throw new Error('本次未找到完整音频');
+  for (const candidate of musicCandidates(track, quality, signal, params => gd(params, signal))) {
+    signal.throwIfAborted(); const h = state.resolverHealth.get(candidate.via);
+    if (h && h.retryAt > Date.now()) continue;
+    if (!options.background) state.priorityWaiters++;
+    try { while ((state.slots.get(candidate.via) || 0) >= 2 || options.background && state.priorityWaiters > 0) await delay(50, undefined, { signal }); }
+    finally { if (!options.background) state.priorityWaiters--; }
+    state.slots.set(candidate.via, (state.slots.get(candidate.via) || 0) + 1); const started = Date.now();
+    try {
+      const url = await candidate.url(); if (!url) throw new Error('未返回音频');
+      const info = validateFullMusic(await probeMusicAudio(url, signal), track.duration, quality);
+      const token = randomBytes(24).toString('hex'), now = Date.now();
+      for (const [k, v] of tickets) if (v.expires < now) tickets.delete(k);
+      if (tickets.size >= 1200) tickets.delete(tickets.keys().next().value!);
+      tickets.set(token, { url: info.finalUrl || url, expires: now + 2 * 60 * 60_000, mimeType: info.mimeType });
+      const via = LX_MUSIC_RESOLVERS.find(r => r.id === candidate.via)?.name || candidate.via;
+      const result: PlaybackResult = { url: `/api/music/stream?ticket=${token}`, expires: now + 180_000, quality, duration: info.duration, codec: info.codec, kbps: info.kbps, sampleRate: info.sampleRate, bits: info.bits, via, preview: false, origin: via };
+      if (state.playback.size >= 1000) state.playback.delete(state.playback.keys().next().value!);
+      state.playback.set(key, result); state.negative.delete(key);
+      state.resolverHealth.set(candidate.via, { ok: true, failures: 0, retryAt: 0, ms: Date.now() - started, codec: info.codec, kbps: info.kbps });
+      return result;
+    } catch (e) {
+      if (signal.aborted) throw e;
+      const msg = e instanceof Error ? e.message : '取链失败', failures = (h?.failures || 0) + 1;
+      state.resolverHealth.set(candidate.via, { ok: false, failures, retryAt: /HTTP 429/.test(msg) ? Date.now() + 300_000 : failures >= 3 && /HTTP 403|HTTP 5|fetch failed|timeout/i.test(msg) ? Date.now() + 60_000 : 0, error: msg.slice(0, 120) });
+    } finally { state.slots.set(candidate.via, Math.max(0, (state.slots.get(candidate.via) || 1) - 1)); }
+  }
+  if (state.negative.size >= 1000) state.negative.delete(state.negative.keys().next().value!);
+  state.negative.set(key, Date.now() + 20_000); throw new Error('没有通过完整音频验证的所选音质');
+}
+export function canonicalMusicKey(track: MusicTrack) {
+  const normalize = (s: string) => s.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g, '');
+  return normalize(track.title) + '\u0000' + normalize(track.artist);
+}
+export function groupMusicCandidates(tracks: MusicTrack[]) {
+  const groups: MusicTrack[][] = [], seen = new Set<string>();
+  for (const t of tracks) {
+    if (seen.has(musicKey(t)) || t.preview || !(t.duration > 0)) continue; seen.add(musicKey(t));
+    const found = groups.find(g => canonicalMusicKey(g[0]) === canonicalMusicKey(t) && Math.abs(g[0].duration - t.duration) <= 4);
+    if (found) found.push(t); else groups.push([t]);
+  }
+  return groups;
+}
+export async function verifyMusicGroup(group: MusicTrack[], signal: AbortSignal): Promise<MusicTrack | null> {
+  for (const t of group) {
+    if (signal.aborted) return null;
+    try { const playback = await resolveMusic(t.source, t.id, signal, { track: t, background: true }); return { ...t, duration: playback.duration, playback, preview: false }; }
+    catch { if (signal.aborted) return null; }
+  }
+  return null;
+}

@@ -7,13 +7,20 @@ export const MUSIC_SOURCES = [
   { id: 'apple', name: 'Apple试听', description: '仅试听片段，非完整歌曲' },
 ] as const;
 export type MusicSource = typeof MUSIC_SOURCES[number]['id'];
+export const MUSIC_QUALITIES = [{ id: 'auto', name: '自动' }, { id: '128k', name: '标准' }, { id: '320k', name: '高品质' }, { id: 'flac', name: '无损' }, { id: 'flac24bit', name: '24bit' }] as const;
+export type MusicQuality = typeof MUSIC_QUALITIES[number]['id'];
+export interface MusicPlayback { url: string; expires: number; quality: MusicQuality; duration: number; codec: string; kbps: number; sampleRate: number; bits: number; via: string }
 export interface MusicTrack {
   source: MusicSource; id: string; title: string; artist: string; album: string;
   duration: number; cover: string; preview?: boolean;
+  playback?: MusicPlayback;
+  searchRank?: number;
 }
+export interface MusicSearchEvent { tracks: MusicTrack[]; checked?: number; total?: number; done?: boolean; nextPage?: number | null; error?: string }
 export interface MusicOutcome { source: MusicSource; tracks: MusicTrack[]; ms: number; error?: string; cached?: boolean }
 export const musicKey = (t: Pick<MusicTrack, 'source' | 'id'>) => `${t.source}:${t.id}`;
 export const musicSourceName = (id: string) => MUSIC_SOURCES.find(s => s.id === id)?.name || id;
+export function musicCodecName(codec = '') { return /AAC/i.test(codec) ? 'AAC' : /MPEG.*Layer.*3|MP3/i.test(codec) ? 'MP3' : codec; }
 export function musicTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;

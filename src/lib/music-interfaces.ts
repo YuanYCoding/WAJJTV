@@ -1,5 +1,7 @@
+import { LX_MUSIC_RESOLVERS } from './music-resolvers';
 /** Public upstream protocols only. Never include site secrets, account cookies, or session tickets here. */
 export const MUSIC_INTERFACES = [
+  ...LX_MUSIC_RESOLVERS.filter(r => ['hello', 'tang', 'sixyin', 'haitang'].includes(r.id)).map(r => ({ id: `lx-${r.id}`, name: r.name, role: '播放解析', platforms: r.platforms.join(' / '), url: r.url, parameters: 'id：平台稳定歌曲ID；quality：128k / 320k / flac / flac24bit，按协议映射。', docs: r.reference, note: '音质与完整时长均按媒体头检测；源文件：' + r.file })),
   { id: 'vkeys-play', name: '落月API · QQ备用播放', role: '播放解析', platforms: 'QQ音乐',
     url: 'https://api.vkeys.cn/v2/music/tencent/geturl?mid={id}&quality=8', parameters: 'id：QQ音乐songmid；quality=8：请求HQ上限，实际可能返回试听。',
     docs: 'https://github.com/lvluoyue/api-doc/blob/main/src/v2/音乐模块/QQ音乐/2-geturl.md', note: '返回试听时明确标记；不处理带ekey的加密文件。' },

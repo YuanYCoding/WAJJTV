@@ -1,6 +1,6 @@
 import { libraryGuard, libraryBody } from '@/lib/library-api-server';
 import { resolveMusic } from '@/lib/music-server';
-import { validMusicIdentity } from '@/lib/music-types';
+import { validMusicIdentity, MUSIC_QUALITIES, type MusicQuality, type MusicTrack } from '@/lib/music-types';
 export const runtime = 'nodejs';
 let active = 0;
 export async function POST(req: Request) {
@@ -10,8 +10,13 @@ export async function POST(req: Request) {
   try {
     const body = await libraryBody(req);
     if (!validMusicIdentity(body.source, body.id)) return Response.json({ error: '歌曲标识无效' }, { status: 400 });
-    const result = await resolveMusic(body.source, String(body.id), AbortSignal.any([req.signal, AbortSignal.timeout(22_000)]));
+    const quality = String(body.quality || 'auto') as MusicQuality;
+    if (!MUSIC_QUALITIES.some(q => q.id === quality)) return Response.json({ error: '音质选项无效' }, { status: 400 });
+    const t = body.track as Partial<MusicTrack> | undefined;
+    const track = t && typeof t.duration === 'number' && Number.isFinite(t.duration) && t.duration > 0 && t.duration <= 21600
+      ? { source: body.source, id: String(body.id), duration: t.duration, title: '', artist: '', album: '', cover: '' } as MusicTrack : undefined;
+    const result = await resolveMusic(body.source, String(body.id), AbortSignal.any([req.signal, AbortSignal.timeout(24_000)]), { quality, track, fresh: body.fresh === true });
     return Response.json(result, { headers: { 'Cache-Control': 'private, no-store' } });
-  } catch { return Response.json({ error: '该歌曲暂时无法播放。可试试同名歌曲的其他来源；会员或地区限制可能影响播放。' }, { status: 502 }); }
+  } catch { return Response.json({ error: '当前没有通过完整音频检测的所选音质，请重试或选择其他音质。' }, { status: 502 }); }
   finally { active--; }
 }
